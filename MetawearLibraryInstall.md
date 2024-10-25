@@ -16,12 +16,11 @@ Pre-Requesites
             sudo apt-get install libbluetooth-dev
             ```
 
-        b) In order to download the metawear API, the vir
+        b) If using pywear library
             ```
-            sudo /*LocationToVenV*/bin/pip3 install pymetawear
-            sudo /*LocationToVenV*/bin/pip3 install pymetawear --upgrade
-            ```
-                pipx install warble
+            sudo apt-get install build-essential cmake
+
+           
 
         c) Download repository
                 git clone https://github.com/mbientlab/MetaWear-SDK-Python.git

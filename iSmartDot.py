@@ -1,5 +1,5 @@
  
-from abc import ABCMeta, ABC, abstractmethod
+from abc import ABCMeta, abstractmethod
 
 class iSmartDot(metaclass=ABCMeta): 
 
@@ -10,16 +10,14 @@ class iSmartDot(metaclass=ABCMeta):
                 hasattr(subclass, 'disconnect'))    
 
     @abstractmethod
-    def connect(MAC_Address):
+    def connect(self, MAC_Address):
         pass
 
     @abstractmethod
     def disconnect(MAC_Address):
         pass
 
+    @abstractmethod
+    def UUID(self) -> str: ...
     # Scan Bluetooth Devices and filters for specific devices
 
-    def scan():
-        pass
-
-    

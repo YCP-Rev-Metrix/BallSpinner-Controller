@@ -10,7 +10,7 @@ class iSmartDot(metaclass=ABCMeta):
                 hasattr(subclass, 'disconnect'))    
 
     @abstractmethod
-    def connect(self, MAC_Address):
+    def connect(self, MAC_Address) -> bool:
         pass
 
     @abstractmethod

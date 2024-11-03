@@ -20,10 +20,11 @@ class MetaMotion(iSmartDot):
     def MetaMotion(self, MAC_Address):
         self.connect(MAC_Address)
         
-    def connect(self, MAC_Address) -> bool:
+    def connect(self, MAC_Address, connection) -> bool:
         print("Attempting to connect to device")
         print(MAC_Address)
         try:
+            self.connection = connection
             self.device = MetaWear(MAC_Address)
             self.device.connect()
             #set connection parameters 7.5ms connection interval, 0 Slave interval, 6s timeout
@@ -41,6 +42,7 @@ class MetaMotion(iSmartDot):
         self.prevAccelTime = self.startAccelTime
         self.startAccelTime = datetime.now()
         sampleRate = int(1/(self.startAccelTime.microsecond - self.prevAccelTime.microsecond)*1000000)
+        self.connection.sendall(bytes("%s -> %s" % (sampleRate, parse_value(data)), 'utf-8'))
         print("%s -> %s" % (sampleRate, parse_value(data)))
         self.samples+= 1
 

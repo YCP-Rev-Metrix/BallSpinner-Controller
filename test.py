@@ -2,17 +2,32 @@ from mbientlab.metawear import MetaWear, libmetawear
 import ConnectionTools
 import MetaMotion
 import SmartDotEmulator
-
 from time import sleep
-
+import RPi.GPIO as GPIO
 import socket
-'''
-# Create a socket object
+
+motorPin = 12
+
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(motorPin, GPIO.OUT)
+print("Motor Off")
+motor_pwm = GPIO.PWM(motorPin, 1000)
+sleep(5)
+motor_pwm.start(0)
+print("Motor ON")
+"""
+availDevices = ConnectionTools.asyncio.run(ConnectionTools.scanAll())
+print("Select SmartDot to Connect to:")
+consInput = input()
+smartDot = MetaMotion.MetaMotion()
+smartDotConnect = False
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 # Bind the socket to an IP address and port
-server_address = ('localhost', 12345)  # Replace 'localhost' with the server's IP if needed
+server_address = ("10.127.7.20", 8411)  # Replace 'localhost' with the server's IP if needed
 server_socket.bind(server_address)
+#192.
 
 # Listen for incoming connections
 server_socket.listen(1)
@@ -21,19 +36,35 @@ print('Server listening on {}:{}'.format(*server_address))
 
 # Accept a connection
 connection, client_address = server_socket.accept()
+smartDotConnect = smartDot.connect(tuple(availDevices.keys())[int(consInput)], connection)# Create a socket object
+
 print('Connected to:', client_address)
 
+
+# Send a response to the client
+connection.sendall(b'Hello from the server!')
 # Receive data from the client
 data = connection.recv(1024)
 print('Received:', data.decode())
 
-# Send a response to the client
-connection.sendall(b'Hello from the server!')
-
+print("Select Rate")
+odr = input()
+print("Select Range")
+range = input()
+print("Poll for How long?")
+timeForAccel = input()
+smartDot.configAccel(int(odr), int(range))
+smartDot.startAccel()
+sleep(int(timeForAccel))
+smartDot.stopAccel()
 # Close the connection
-connection.close()
-server_socket.close()
-'''
+try:
+    while 1:
+        pass
+except:
+    connection.close()
+    server_socket.close()
+"""
 def startMagTest():
     # When scan cancelled, connect to first SmartDot in Dict
     smartDot = ConnectionTools.MetaMotion()
@@ -50,4 +81,4 @@ def startMagTest():
     except:
         smartDot.stopAccel()
 
-startMagTest()
+#startMagTest()

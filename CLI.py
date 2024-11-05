@@ -63,10 +63,10 @@ def smartDotCLI():
         else:
             print("Invalid Input, Please Try Again\n")
 
-def motorCLI(self):
+def motorCLI():
     print("Which Pin is the Motor Connected to?")
     consInput = input()
-    motor = Motor.Motor.Motor(self, consInput)
+    motor = Motor.Motor(int(consInput))
     while(consInput != 'E'):
         print("----------------------")
         print("Choose your function:")
@@ -74,6 +74,7 @@ def motorCLI(self):
         print("[2] Stop Motor")
         print('[3] Change Speed of Motor')
         print('[E] Exit')
+        consInput = input()
 
         if consInput == "1":
             motor.turnOnMotor()
@@ -82,9 +83,9 @@ def motorCLI(self):
             motor.turnOffMotor()
 
         elif consInput == "3":
-            print("Select Speed Between 0\% - 100\%")
+            print("Select Speed Between 0% - 100%")
             consInput = input()
-            motor.changeSpeed(consInput)
+            motor.changeSpeed(int(consInput))
             
         elif consInput == "E":
             pass
@@ -94,6 +95,7 @@ consInput = ""
 print("Ball Spinner Controller UI:")
 print("Which Part Are You Interacting With?")
 while(consInput != 'E'):
+    print("----------------------")
     print("[1] SmartDot Module")
     print("[2] Motor")
 

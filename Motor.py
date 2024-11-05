@@ -3,7 +3,7 @@ import RPi.GPIO as GPIO
 
 class Motor():
 
-    def Motor(self, GPIOPin):
+    def __init__(self, GPIOPin : int):
         #Set PWM Pin Motor is Connected to 
         self.GPIOPin = GPIOPin #12
 
@@ -12,21 +12,13 @@ class Motor():
         GPIO.setmode(GPIO.BOARD)
         GPIO.setup(GPIOPin, GPIO.OUT)
 
-
-        self.PWM = GPIO.PWM(GPIOPin, 1000)
+        #1kHz
+        self.PWM = GPIO.PWM(GPIOPin, 500)
         #Declare on/off State (0 = Off; 1 = On)
         self.state = False
 
-    # Turns on Motor at Power (100% Duty Cycle)
-    def turnOnMotor(self):
-        if not self.state:
-            self.PWM.start(100)
-            self.state = True
-        else:
-            print("Unable to Start Motor: Motor is Already Running")
-
     # Turns on Motor at Specified Power (Duty Cycle)
-    def turnOnMotor(self, dutyCycle : int):
+    def turnOnMotor(self, dutyCycle = 100):
         if not self.state:
             self.PWM.start(dutyCycle)
             self.state = True
@@ -42,6 +34,7 @@ class Motor():
 
     def changeSpeed(self, dutyCycle : int):
         if self.state:
-            self.PWM.ChangeDutyCycle(dutyCycle/100)
+            self.PWM.ChangeDutyCycle(dutyCycle)
+            print(self.PWM)
         else:
             print("Unable to Change Speed: Motor is Not Running")

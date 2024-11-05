@@ -3,20 +3,10 @@ import ConnectionTools
 import MetaMotion
 import SmartDotEmulator
 from time import sleep
-import RPi.GPIO as GPIO
 import socket
 
-motorPin = 12
 
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BOARD)
-GPIO.setup(motorPin, GPIO.OUT)
-print("Motor Off")
-motor_pwm = GPIO.PWM(motorPin, 1000)
-sleep(5)
-motor_pwm.start(0)
-print("Motor ON")
-"""
+
 availDevices = ConnectionTools.asyncio.run(ConnectionTools.scanAll())
 print("Select SmartDot to Connect to:")
 consInput = input()
@@ -64,7 +54,7 @@ try:
 except:
     connection.close()
     server_socket.close()
-"""
+
 def startMagTest():
     # When scan cancelled, connect to first SmartDot in Dict
     smartDot = ConnectionTools.MetaMotion()

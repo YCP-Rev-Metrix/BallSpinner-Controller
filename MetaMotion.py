@@ -20,21 +20,26 @@ class MetaMotion(iSmartDot):
     def MetaMotion(self, MAC_Address):
         self.connect(MAC_Address)
         
-    def connect(self, MAC_Address, connection) -> bool:
+    def setCommsPort(self, connection):
+        self.connection = connection
+
+    def connect(self, MAC_Address) -> bool:
         print("Attempting to connect to device")
         print(MAC_Address)
         try:
-            self.connection = connection
+            if self.connection == None:
+                print("socket not set")
             self.device = MetaWear(MAC_Address)
-            self.device.connect()
+            cnnected = self.device.connect()
+            print(cnnected)
             #set connection parameters 7.5ms connection interval, 0 Slave interval, 6s timeout
             libmetawear.mbl_mw_settings_set_connection_parameters(self.device.board, 7.5, 7.5, 0, 6000)
             self.callback = FnVoid_VoidP_DataP(self.data_handler)
             self.samples = 0
             return True
-    
+
         #Timeout occured and Connection was unsuccessful     
-        except WarbleException:
+        except:
             print("Unable to connect to device")
             return False
     
@@ -42,7 +47,10 @@ class MetaMotion(iSmartDot):
         self.prevAccelTime = self.startAccelTime
         self.startAccelTime = datetime.now()
         sampleRate = int(1/(self.startAccelTime.microsecond - self.prevAccelTime.microsecond)*1000000)
-        self.connection.sendall(bytes("%s -> %s" % (sampleRate, parse_value(data)), 'utf-8'))
+        
+        #if connection was established, send data to socket
+        if self.connection !=  None:
+             self.connection.sendall(bytes("%s -> %s" % (sampleRate, parse_value(data)), 'utf-8'))
         print("%s -> %s" % (sampleRate, parse_value(data)))
         self.samples+= 1
 
@@ -53,7 +61,9 @@ class MetaMotion(iSmartDot):
 
         print("Configuring Device")
         libmetawear.mbl_mw_acc_set_odr(self.device.board, dataRate)
+        print("ODR SET")        
         libmetawear.mbl_mw_acc_set_range(self.device.board, range)  
+        print("RANGE SET")
         libmetawear.mbl_mw_acc_write_acceleration_config(self.device.board)
 
         print("Subscribing to acceleration data")

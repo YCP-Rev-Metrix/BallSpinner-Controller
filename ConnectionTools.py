@@ -39,6 +39,7 @@ async def scanAll() -> dict:
                     i += 1
                 count += 1
 
-    except : 
+    except : #Called when KeyInterrut ^C is called
+        BleScanner.stop()
         return availDevices
 

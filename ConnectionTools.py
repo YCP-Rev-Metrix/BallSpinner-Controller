@@ -32,8 +32,16 @@ class BallSpinnerController():
     def smartDotHandler(self):
         print("Handling SmartDot:")
         def accelDataSignal(dataBytes : bytearray):
-            print("Comms Received: " + (dataBytes.__str__()))
-        self.smartDot.setDataSignals(accelDataSignal, None, None)
+            print("Acceleration: " + (dataBytes.__str__()))
+        
+        def magDataSignal(dataBytes : bytearray):
+            print("Magnetometer: " + (dataBytes.__str__()))
+        
+        def gyroDataSignal(dataBytes : bytearray):
+            print("Gyroscope: " + (dataBytes.__str__()))
+
+
+        self.smartDot.setDataSignals(accelDataSignal, magDataSignal, gyroDataSignal)
         asyncio.run(asyncio.sleep(9999))
 
         
@@ -125,4 +133,6 @@ smartDotConnect = smartDot.connect(tuple(availDevices.keys())[0])
 myBallz = BallSpinnerController()
 myBallz.smartDot = smartDot
 myBallz.smartDot.startAccel(100,2)
+myBallz.smartDot.startGyro(100, 100)
+myBallz.smartDot.startMag(100, 10)
 myBallz.smartDotHandler()

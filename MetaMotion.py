@@ -26,6 +26,10 @@ class MetaMotion(iSmartDot):
         self.accelDataSig =  accelDataSig
         self.gyroDataSig = gyroDataSig
         self.magDataSig = magDataSig
+        print(self.accelDataSig)
+        print(self.gyroDataSig)
+        print(self.magDataSig)
+        sleep(3)  
     
     def setCommsPort(self, connection):
         self.commsChannel = connection
@@ -51,38 +55,44 @@ class MetaMotion(iSmartDot):
             print("Unable to connect to device")
             return False
     
-    def accelDataHandler(self, ctx, data): 
-        self.prevAccelTime = self.startAccelTime
-        self.startAccelTime = datetime.now()
-        
-        print(datetime.now().timestamp())
-        sampleRate = int(1/(self.startAccelTime.microsecond - self.prevAccelTime.microsecond)*1000000)
-        
+    def accelDataHandler(self, ctx, data):     
         parsedData = parse_value(data)
+        timeStamp = datetime.now().timestamp()
+        
+        timeStampInBytes : bytearray = struct.pack(">f", timeStamp)
         xValInBytes : bytearray = struct.pack('>f', parsedData.x) 
         yValInBytes : bytearray = struct.pack('>f', parsedData.y)
         zValInBytes : bytearray = struct.pack('>f', parsedData.z)
 
-        mess = xValInBytes + yValInBytes + zValInBytes
+        mess = timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
        
-        #if connection was established, send data to socket
-        if self.commsChannel !=  None:
-            self.commsChannel.sendall(bytes("%s -> %s" % (sampleRate, parse_value(data)), 'utf-8'))
-       # print(len(bytearray(parse_value(data).x)))
-        #print("Accel: %s -> %s" % (sampleRate, parsedData))
         self.accelDataSig(mess)
 
     def magDataHandler(self, ctx, data):
-        self.prevMagTime = self.startMagTime
-        self.startMagTime = datetime.now()
-        sampleRate = int(1/(self.startMagTime.microsecond - self.prevMagTime.microsecond)*1000000)
-        print("Mag: %s -> %s" % (sampleRate, parse_value(data)))     
+        parsedData = parse_value(data)
+        timeStamp = datetime.now().timestamp()
+        
+        timeStampInBytes : bytearray = struct.pack(">f", timeStamp)
+        xValInBytes : bytearray = struct.pack('>f', parsedData.x) 
+        yValInBytes : bytearray = struct.pack('>f', parsedData.y)
+        zValInBytes : bytearray = struct.pack('>f', parsedData.z)
+
+        mess = timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+       
+        self.magDataSig(mess)
 
     def gyroDataHandler(self, ctx, data):
-        self.prevGyroTime = self.startGyroTime
-        self.startGyroTime = datetime.now()
-        sampleRate = int(1/(self.startGyroTime.microsecond - self.prevGyroTime.microsecond)*1000000)
-        print("Gyro: %s -> %s" % (sampleRate, parse_value(data))) 
+        parsedData = parse_value(data)
+        timeStamp = datetime.now().timestamp()
+        
+        timeStampInBytes : bytearray = struct.pack(">f", timeStamp)
+        xValInBytes : bytearray = struct.pack('>f', parsedData.x) 
+        yValInBytes : bytearray = struct.pack('>f', parsedData.y)
+        zValInBytes : bytearray = struct.pack('>f', parsedData.z)
+
+        mess = timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+
+        self.gyroDataSig(mess)
 
 
     def startMag(self,  dataRate : int, odr : None):  

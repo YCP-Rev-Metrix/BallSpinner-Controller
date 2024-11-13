@@ -10,7 +10,7 @@ def smartDotCLI():
     print("Select SmartDot to Connect to:")
     consInput = input()
     smartDot = MetaMotion.MetaMotion()
-    smartDotConnect = smartDot.connect(tuple(availDevices.keys())[int(consInput)],None)
+    smartDotConnect = smartDot.connect(tuple(availDevices.keys())[int(consInput)])
     # Connect to Selected SmartDot Module
     while not smartDotConnect:
         print("Unable to Connect to ")
@@ -28,7 +28,13 @@ def smartDotCLI():
         print("[3] Turn on Green LED")
         print("[4] Turn off LED")
         print("[5] Start Accel Sensing")
-        print("[6] Start Accel Sensing")
+        print("[6] Start Gyro Sensing")
+        print("[7] Start Mag Sensing")
+        print("[8] Start All Sensing")
+
+        if smartDot.commsChannel == None:
+            print("[9] Connect to PC")
+
 
         print("[E] Exit")
         consInput = input()
@@ -52,11 +58,45 @@ def smartDotCLI():
             range = input()
             print("Poll for How long?")
             timeForAccel = input()
-            smartDot.configAccel(int(odr), int(range))
-            smartDot.startAccel()
+            smartDot.startAccel(int(odr), int(range))
             time.sleep(int(timeForAccel))
             smartDot.stopAccel()
 
+        elif consInput == "6":
+            print("Select Rate")
+            odr = input()
+            print("Select Range")
+            range = input()
+            print("Poll for How long?")
+            timeForGyro = input()
+            smartDot.startGyro(int(odr), int(range))
+            time.sleep(int(timeForGyro))
+            smartDot.stopGyro()
+
+        elif consInput == "7":
+            print("Select Rate")
+            print("[1] 10 Hz")
+            print("[2] 20 Hz")
+
+            dataRate = input()
+            print("Poll for How long?")
+            timeForMag = input()
+            if dataRate == "1":
+                smartDot.startMag(10, None)
+            elif dataRate == "2":
+                smartDot.startMag(20, None)
+            else:
+                print("Too bad, polling at 10Hz")
+                smartDot.startMag(10, None)
+
+            time.sleep(int(timeForMag))
+            smartDot.stopMag()
+        
+        elif consInput == "8":
+            smartDot.startMag(10, 10)
+            smartDot.startAccel(100, 10)
+            smartDot.startGyro(10, 10)
+            
         elif consInput == "E":
             pass
 
@@ -89,7 +129,6 @@ def motorCLI():
             
         elif consInput == "E":
             pass
-
 
 consInput = ""
 print("Ball Spinner Controller UI:")

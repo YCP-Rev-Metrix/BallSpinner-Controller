@@ -4,8 +4,22 @@ import MetaMotion
 import SmartDotEmulator
 from time import sleep
 import socket
+import RPi.GPIO as GPIO
+
+'''
+#Set PWM Pin Motor is Connected to 
+GPIOPin = 35
+#Configure GPIO Pin
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BOARD)
+GPIO.setup(GPIOPin, GPIO.OUT)
 
 
+PWM = GPIO.PWM(GPIOPin, 1000)
+print("start")
+PWM.start(100)
+sleep(500)
+PWM.stop()
 
 availDevices = ConnectionTools.asyncio.run(ConnectionTools.scanAll())
 print("Select SmartDot to Connect to:")
@@ -54,6 +68,7 @@ try:
 except:
     connection.close()
     server_socket.close()
+'''
 
 def startMagTest():
     # When scan cancelled, connect to first SmartDot in Dict
@@ -61,14 +76,11 @@ def startMagTest():
     findDotMacAddress = ConnectionTools.asyncio.run(ConnectionTools.scanAll())
 
     #connects to first SmartDot module found 
-    smartDot.connect(findDotMacAddress.popitem()[0])
-    smartDot.configAccel(25, 2)
+    smartDot.connect(findDotMacAddress.popitem()[0])   
 
     #Samples for 99 seconds, cancel to stop
-    try: 
-        smartDot.startAccel()
-        sleep(99)
-    except:
-        smartDot.stopAccel()
+    smartDot.startMag()
+    sleep(99)
+    print("DidNotWork")
 
-#startMagTest()
+startMagTest()

@@ -5,8 +5,22 @@ from MetaMotion import MetaMotion
 from SmartDotEmulator import SmartDotEmulator
 from iSmartDot import iSmartDot
 import socket
-import signal
+import struct
+from enum import Enum
 
+# class syntax
+class BSCModes(Enum):
+    #Controller not Connected to Application
+    WAITING_FOR_APP_INITILIZATION  = 1
+
+    #Controller Connected to Application Waiting for Next Message Signal
+    IDLE = 2
+    
+    #Searching For Bluetooth
+    BLUETOOTH_SCANNING = 3
+
+    
+    
 class BallSpinnerController():
     def setSmartDot(self, smartDot : MetaMotion):
         self.smartDot = smartDot
@@ -14,6 +28,7 @@ class BallSpinnerController():
     def __init__(self):
         #determine global ip address
         self.iSmartDot = None
+
         ipAddr = None
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -28,6 +43,10 @@ class BallSpinnerController():
         print('Server listening on {}:{}'.format(*server_address))
         self.commsPort.bind(server_address)
 
+        #wait for a device to attempt TCP connection to Port
+        self.commsPort.listen(1)
+        self.commsChannel : socket = self.commsPort.accept()
+        asyncio.run
 
     def smartDotHandler(self):
         print("Handling SmartDot:")
@@ -47,19 +66,31 @@ class BallSpinnerController():
         
 
     async def commsHandler(self):
-        #wait for a device to attempt TCP connection to Port
-        self.commsPort.listen(1)
-        possibleCommsChannel = self.commsPort.accept()
         
         #Read first message com
         data = possibleCommsChannel.recv(1024)
         print(type(data))
 
+        #parse message
         match data[0]: 
-            case(0x01):
+            case(0x81):
+                #Message Received: | Mess Type: 0x81 | Mess Size: 0x0001 | RandomByte: XXXX 
+                print("Message Type: App Sending Start Message")
                 if self.commsChannel != None:
                     #Send Error: Already Connected to Application
                     pass
+                else:
+                    # Confirm Communications are established and send confirmation signal
+                    #| Mess Type: 0x82 | Mess Size: 0x0001 | RandomByte: XXXX 
+                    
+                    #Grab Random Byte from third and resend
+                    randomByte = data[2]
+                    self.commsChannel.send(0x820001 + randomByte.hex())
+                    
+                    self.commsChannel : socket.socket = possibleCommsChannel
+
+            case(0x83):
+                pass         
         
         '''
         availDevices = asyncio.run(scanAll())

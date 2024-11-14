@@ -32,6 +32,7 @@ class BallSpinnerController():
         self.mode : BSCModes = BSCModes.WAITING_FOR_APP_INITILIZATION
         
         ipAddr = None
+        
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
@@ -53,9 +54,12 @@ class BallSpinnerController():
         
         
         #Start Threads
-        #asyncio.run
-
-    def smartDotHandler(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(asyncio.gather(
+            self.commsHandler()))       
+        
+    async def smartDotHandler(self):
         print("Handling SmartDot:")
         def accelDataSignal(dataBytes : bytearray):
             print("Acceleration: " + (dataBytes.__str__()))
@@ -77,7 +81,7 @@ class BallSpinnerController():
         #Read first message com
         data = self.commsChannel.recv(1024)
         print(type(data))
-
+        print(data)
         #parse message
         match data[0]: 
             case(0x81):
@@ -95,8 +99,8 @@ class BallSpinnerController():
                     #Grab Random Byte from third and resend
                     randomByte = data[2]
                     self.commsChannel.send(0x820001 + randomByte.hex())
-                    
-                    self.commsChannel : socket.socket = possibleCommsChannel
+                    self.mode = BSCModes.IDLE
+
 
             case(0x83):
                 pass         
@@ -127,7 +131,7 @@ class BallSpinnerController():
 
         '''
     
-    
+        
 #Scans all modules to see which to connect to
 async def scanAll() -> dict:
     
@@ -177,3 +181,5 @@ myBallz.smartDot.startGyro(100, 100)
 myBallz.smartDot.startMag(100, 10)
 myBallz.smartDotHandler()
 '''
+
+BallSpinnerController()

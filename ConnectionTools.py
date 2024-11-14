@@ -4,6 +4,7 @@ import six
 from MetaMotion import MetaMotion
 from SmartDotEmulator import SmartDotEmulator
 from iSmartDot import iSmartDot
+from Motor import Motor
 import socket
 import struct
 from enum import Enum
@@ -19,7 +20,7 @@ class BSCModes(Enum):
     #Searching For Bluetooth
     BLUETOOTH_SCANNING = 3
 
-    
+
     
 class BallSpinnerController():
     def setSmartDot(self, smartDot : MetaMotion):
@@ -28,13 +29,16 @@ class BallSpinnerController():
     def __init__(self):
         #determine global ip address
         self.iSmartDot = None
-
+        self.mode : BSCModes = BSCModes.WAITING_FOR_APP_INITILIZATION
+        
         ipAddr = None
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
                 ipAddr = s.getsockname()[0]
+
         except Exception:
+            # ERROR: Not Connected to Internet
             pass 
 
         #initiate Port to 8411
@@ -46,7 +50,10 @@ class BallSpinnerController():
         #wait for a device to attempt TCP connection to Port
         self.commsPort.listen(1)
         self.commsChannel : socket = self.commsPort.accept()
-        asyncio.run
+        
+        
+        #Start Threads
+        #asyncio.run
 
     def smartDotHandler(self):
         print("Handling SmartDot:")
@@ -68,7 +75,7 @@ class BallSpinnerController():
     async def commsHandler(self):
         
         #Read first message com
-        data = possibleCommsChannel.recv(1024)
+        data = self.commsChannel.recv(1024)
         print(type(data))
 
         #parse message
@@ -76,8 +83,10 @@ class BallSpinnerController():
             case(0x81):
                 #Message Received: | Mess Type: 0x81 | Mess Size: 0x0001 | RandomByte: XXXX 
                 print("Message Type: App Sending Start Message")
-                if self.commsChannel != None:
+                if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
                     #Send Error: Already Connected to Application
+
+                    #Reset
                     pass
                 else:
                     # Confirm Communications are established and send confirmation signal
@@ -157,7 +166,7 @@ async def scanAll() -> dict:
         BleScanner.stop()
         return availDevices
 
-
+'''
 availDevices = asyncio.run(scanAll())
 smartDot = MetaMotion()
 smartDotConnect = smartDot.connect(tuple(availDevices.keys())[0])
@@ -167,3 +176,4 @@ myBallz.smartDot.startAccel(100,2)
 myBallz.smartDot.startGyro(100, 100)
 myBallz.smartDot.startMag(100, 10)
 myBallz.smartDotHandler()
+'''

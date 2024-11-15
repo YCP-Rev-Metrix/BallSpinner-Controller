@@ -47,5 +47,6 @@ class Motor():
             self.changeSpeed(int((i/25)*100))
             sleep(.5)
 
+input()
 motomoto = Motor(12)
 motomoto.rampUp()

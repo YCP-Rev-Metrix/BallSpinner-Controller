@@ -30,7 +30,7 @@ class BallSpinnerController():
         #determine global ip address
         self.iSmartDot = None
         self.mode : BSCModes = BSCModes.WAITING_FOR_APP_INITILIZATION
-        
+
         ipAddr = None
         
         try:
@@ -50,7 +50,7 @@ class BallSpinnerController():
 
         #wait for a device to attempt TCP connection to Port
         self.commsPort.listen(1)
-        self.commsChannel : socket = self.commsPort.accept()
+        self.commsChannel, clientIp  = self.commsPort.accept()
         
         
         #Start Threads
@@ -77,35 +77,46 @@ class BallSpinnerController():
         
 
     async def commsHandler(self):
+            while(1):
+            #Read first message com
+                data = self.commsChannel.recv(1024)
+                print(type(data))
+                print(data.hex())
+                #parse message
+                match data[0]: 
+                    case(0x81):
+                        #Message Received: | Mess Type: 0x81 | Mess Size: 0x0001 | RandomByte: XXXX 
+                        print("Message Type: App Sending Start Message")
+                        if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
+                            #Send Error: Already Connected to Application
+
+                            #Reset
+                            pass
+                        else:
+                            # Confirm Communications are established and send confirmation signal
+                            #| Mess Type: 0x82 | Mess Size: 0x0001 | RandomByte: XXXX 
+                            
+                            #Grab Random Byte from third and resend
+                            bytesData = bytearray([0x82, 0x00, 0x01, data[3]]) 
+                            #bytesData.
+                            # append(data[2])
+                            print(bytes(bytesData))
+                            self.commsChannel.send(bytesData)
+                            self.mode = BSCModes.IDLE
+
+
+                    case(0x83):
+                        print("Looking For Pi")
+                        name : str = "MyBallz"
+                        bytesData =bytearray([0x84, 0x00, name.__len__()])
+                        bytesData.extend(name.encode("utf-8"))
+                        print(bytes(bytesData))
+                        self.commsChannel.send(bytesData)
+                        self.mode = BSCModes.IDLE
+                        pass
+                        
         
-        #Read first message com
-        data = self.commsChannel.recv(1024)
-        print(type(data))
-        print(data)
-        #parse message
-        match data[0]: 
-            case(0x81):
-                #Message Received: | Mess Type: 0x81 | Mess Size: 0x0001 | RandomByte: XXXX 
-                print("Message Type: App Sending Start Message")
-                if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
-                    #Send Error: Already Connected to Application
-
-                    #Reset
-                    pass
-                else:
-                    # Confirm Communications are established and send confirmation signal
-                    #| Mess Type: 0x82 | Mess Size: 0x0001 | RandomByte: XXXX 
-                    
-                    #Grab Random Byte from third and resend
-                    randomByte = data[2]
-                    self.commsChannel.send(0x820001 + randomByte.hex())
-                    self.mode = BSCModes.IDLE
-
-
-            case(0x83):
-                pass         
-        
-        '''
+    '''
         availDevices = asyncio.run(scanAll())
         print("Select SmartDot to Connect to:")
         consInput = input()
@@ -182,4 +193,3 @@ myBallz.smartDot.startMag(100, 10)
 myBallz.smartDotHandler()
 '''
 
-BallSpinnerController()

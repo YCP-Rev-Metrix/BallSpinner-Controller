@@ -93,10 +93,17 @@ def smartDotCLI():
             smartDot.stopMag()
         
         elif consInput == "8":
+            print("Poll for How long?")
+            timeForMag = input()
+        
             smartDot.startMag(10, 10)
             smartDot.startAccel(100, 10)
             smartDot.startGyro(10, 10)
-            
+          
+            time.sleep(int(timeForMag))
+            smartDot.stopMag()
+            smartDot.stopAccel()
+            smartDot.stopGyro()
         elif consInput == "E":
             pass
 

@@ -55,42 +55,46 @@ class MetaMotion(iSmartDot):
             print("Unable to connect to device")
             return False
     
-    def accelDataHandler(self, ctx, data):     
+    def accelDataHandler(self, ctx, data): 
+        self.AccelSampleCount += 1   
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp()
         
-        timeStampInBytes : bytearray = struct.pack(">f", timeStamp)
-        xValInBytes : bytearray = struct.pack('>f', parsedData.x) 
-        yValInBytes : bytearray = struct.pack('>f', parsedData.y)
-        zValInBytes : bytearray = struct.pack('>f', parsedData.z)
+        sampleCountInBytes = struct.pack('>I',self.AccelSampleCount )[1:4]
+        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+        xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
+        yValInBytes : bytearray = struct.pack('<f', parsedData.y)
+        zValInBytes : bytearray = struct.pack('<f', parsedData.z)
+        
+        mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
 
-        mess = timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
-       
+
         self.accelDataSig(mess)
 
     def magDataHandler(self, ctx, data):
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp()
         
-        timeStampInBytes : bytearray = struct.pack(">f", timeStamp)
-        xValInBytes : bytearray = struct.pack('>f', parsedData.x) 
-        yValInBytes : bytearray = struct.pack('>f', parsedData.y)
-        zValInBytes : bytearray = struct.pack('>f', parsedData.z)
+        sampleCountInBytes = struct.pack('>I',self.MagSampleCount )[1:4]
+        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+        xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
+        yValInBytes : bytearray = struct.pack('<f', parsedData.y)
+        zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
-        mess = timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
-       
+        mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
         self.magDataSig(mess)
 
     def gyroDataHandler(self, ctx, data):
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp()
         
-        timeStampInBytes : bytearray = struct.pack(">f", timeStamp)
-        xValInBytes : bytearray = struct.pack('>f', parsedData.x) 
-        yValInBytes : bytearray = struct.pack('>f', parsedData.y)
-        zValInBytes : bytearray = struct.pack('>f', parsedData.z)
+        sampleCountInBytes = struct.pack('>I',self.GyroSampleCount )[1:4]
+        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+        xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
+        yValInBytes : bytearray = struct.pack('<f', parsedData.y)
+        zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
-        mess = timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+        mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
 
         self.gyroDataSig(mess)
 
@@ -108,7 +112,8 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_mag_bmm150_enable_b_field_sampling(self.device.board)
         self.startMagTime = datetime.now()
         libmetawear.mbl_mw_mag_bmm150_start(self.device.board)
-       
+        self.MagSampleCount = 0
+
     def stopMag(self):
         print("Stopping Magnetometer sampling")
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
@@ -138,7 +143,8 @@ class MetaMotion(iSmartDot):
             libmetawear.mbl_mw_acc_start(self.device.board)
         else:
             print("Unable to Start Polling Data: Acceleration Not Enabled")
-        
+        self.AccelSampleCount = 0
+
     def stopAccel(self):
         print("Stopping acceleration sampling")
         libmetawear.mbl_mw_acc_stop(self.device.board)
@@ -163,6 +169,8 @@ class MetaMotion(iSmartDot):
         
         self.startGyroTime = datetime.now()
         libmetawear.mbl_mw_gyro_bmi160_start(self.device.board)
+        self.GyroSampleCount = 0
+
 
     def stopGyro(self):
         libmetawear.mbl_mw_gyro_bmi160_stop(self.device.board)

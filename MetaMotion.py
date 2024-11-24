@@ -153,7 +153,7 @@ class MetaMotion(iSmartDot):
     
     def startGyro(self, dataRate : int, range : int):
             
-        # Set ODR to 200Hz
+        # Set ODR to 100Hz
         libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, GyroBoschOdr._100Hz)
 
         # Set data range to +/250 degrees per second

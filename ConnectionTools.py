@@ -63,12 +63,12 @@ class BallSpinnerController():
         def accelDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x8A, 0x00, 0x13, 0x41])
             bytesData.extend(dataBytes)
-            #self.commsChannel.sendall(bytesData)
+            self.commsChannel.sendall(bytesData)
 
         def magDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x8A, 0x00, 0x13, 0x4D])
             bytesData.extend(dataBytes)
-            #self.commsChannel.sendall(bytesData)
+            self.commsChannel.sendall(bytesData)
         
         def gyroDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x8A, 0x00, 0x13, 0x47])
@@ -81,7 +81,7 @@ class BallSpinnerController():
         #Instantly Setting the Start Configs for the 9DOF's to skip implementation
         self.smartDot.startMag(10, 10)
         self.smartDot.startAccel(100, 10)
-        self.smartDot.startGyro(10, 10)       
+        self.smartDot.startGyro(100, 10)       
         await self.wait_for_completion()
         print("Handler Done")
 
@@ -154,9 +154,9 @@ class BallSpinnerController():
                                 asyncio.create_task(self.smartDotHandler())    
 
                                 #Turn On Motors
-                                self.PrimMotor = Motor(7)
-                                self.secMotor1 = Motor(11)
-                                self.secMotor2 = Motor(12)                
+                                self.PrimMotor = Motor(40)
+                                self.secMotor1 = Motor(38)
+                                self.secMotor2 = Motor(35)                
 
                                 self.PrimMotor.turnOnMotor(0)
                                 self.secMotor1.turnOnMotor(0)
@@ -168,9 +168,9 @@ class BallSpinnerController():
                             print("Motor2: %i" % data[4])
                             print("Motor3: %i" % data[5])
 
-                            self.PrimMotor.changeSpeed(int(data[3]/30)) 
-                            self.secMotor1.changeSpeed(int(data[4]/30)) 
-                            self.secMotor2.changeSpeed(int(data[5]/30))
+                            self.PrimMotor.changeSpeed(int(data[3]/30*100)) 
+                            self.secMotor1.changeSpeed(int(data[4]/12*100)) 
+                            self.secMotor2.changeSpeed(int(data[5]/12*100))
 
                             
                     
@@ -251,5 +251,4 @@ myBallz.smartDot.startGyro(100, 100)
 myBallz.smartDot.startMag(100, 10)
 myBallz.smartDotHandler()
 '''
-
 BallSpinnerController()

@@ -1,10 +1,10 @@
 import asyncio
 from mbientlab.warble import BleScanner
 import six
-from MetaMotion import MetaMotion
-from SmartDotEmulator import SmartDotEmulator
-from iSmartDot import iSmartDot
-from Motor import Motor
+from .MetaMotion import MetaMotion
+from .SmartDotEmulator import SmartDotEmulator
+from .iSmartDot import iSmartDot
+from .Motor import Motor
 import socket
 import struct
 from enum import Enum

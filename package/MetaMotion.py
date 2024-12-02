@@ -9,7 +9,7 @@ from datetime import datetime
 import platform
 import sys
 
-from iSmartDot import iSmartDot
+from .iSmartDot import iSmartDot
 
 class MetaMotion(iSmartDot):
 

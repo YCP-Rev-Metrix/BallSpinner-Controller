@@ -1,13 +1,14 @@
-import ConnectionTools
-import MetaMotion
+from .ConnectionTools import scanAll
+from .MetaMotion import MetaMotion
+from .Motor import Motor
 import time
-import Motor
+import asyncio
 
 class CLI:
     def smartDotCLI():
         print("Starting Connection to SmartDot Module")
         print("Press ^C to Stop Scanning SmartDot Module")
-        availDevices = ConnectionTools.asyncio.run(ConnectionTools.scanAll())
+        availDevices = asyncio.run(scanAll())
         print("Select SmartDot to Connect to:")
         consInput = input()
         smartDot = MetaMotion.MetaMotion()
@@ -16,7 +17,7 @@ class CLI:
         while not smartDotConnect:
             print("Unable to Connect to ")
             print("Press ^C to Stop Scanning SmartDot Module")
-            availDevices = ConnectionTools.asyncio.run(ConnectionTools.scanAll())
+            availDevices = asyncio.run(scanAll())
             print("Select SmartDot to Connect to:")
             consInput = input()
             smartDot = MetaMotion.MetaMotion(tuple(availDevices.keys())[int(consInput)])

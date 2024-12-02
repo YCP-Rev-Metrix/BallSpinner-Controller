@@ -33,7 +33,7 @@ class Motor():
             print("Unable to Stop Motor: Motor is Not Running")
 
     def changeSpeed(self, dutyCycle : int):
-        print("Changing Speed %i" % dutyCycle)
+        print("Changing Speed %i%%" % dutyCycle)
         if self.state:
             self.PWM.ChangeDutyCycle(dutyCycle)
         

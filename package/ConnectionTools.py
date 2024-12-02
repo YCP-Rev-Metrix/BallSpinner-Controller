@@ -74,7 +74,7 @@ class BallSpinnerController():
             bytesData = bytearray([0x8A, 0x00, 0x13, 0x47])
             bytesData.extend(dataBytes)
             self.commsChannel.sendall(bytesData)
-            #print("Gyroscope: " + (dataBytes.__str__()))
+            print("Gyroscope: " + (dataBytes.hex()))
 
 
         self.smartDot.setDataSignals(accelDataSignal, magDataSignal, gyroDataSignal)
@@ -135,16 +135,17 @@ class BallSpinnerController():
                             if data[3:9].hex() == "000000000000":
                                 print("TRUEEEEE")
                                 self.mode = BSCModes.BLUETOOTH_SCANNING
-                                self.scanner = asyncio.create_task(tCPscanAll(self))
+                                self.scanner = asyncio.create_task(self.tCPscanAll())
                                 print("Connecting to \"SmartDot\"")
                             #Keep Trying to connect to Module in Presentation Ball
                             else:
                                 self.scanner.cancel()
                                 self.smartDot = None
                                 self.smartDot = MetaMotion()
-                                smartDotMACStr = "%s:%s:%s:%s:%s:%s" % (data[3:5].hex(), 
-                                data[5:7].hex(), data[7:9].hex(), data[9:11].hex(), data[11:13].hex(), 
-                                data[13:15].hex())  
+                                smartDotMACStr = "%s:%s:%s:%s:%s:%s" % (data[3:4].hex(), 
+                                data[4:5].hex(), data[5:6].hex(), data[6:7].hex(), data[7:8].hex(), 
+                                data[8:9].hex())  
+                                print("Connecting to "+ smartDotMACStr)
                                 print(smartDotMACStr)
                                 if not self.smartDot.connect(smartDotMACStr) :   
                                     self.smartDot = None
@@ -156,7 +157,8 @@ class BallSpinnerController():
                                 self.mode = BSCModes.READYFORINSTRUCTIONS
                                 
                         case(0x88):
-                            print("Received Motor Instruction")
+
+                            #print("Received Motor Instruction")
                             if self.mode == BSCModes.READYFORINSTRUCTIONS: 
                                 print("Initializing Sensors")
                                 # First Motor Instruction:                   
@@ -172,11 +174,11 @@ class BallSpinnerController():
                                 self.secMotor2.turnOnMotor(0)
 
                                 self.mode = BSCModes.TAKING_SHOT_DATA
-
+                            '''
                             print("Motor1: %i" % data[3])
                             print("Motor2: %i" % data[4])
                             print("Motor3: %i" % data[5])
-
+                            '''
                             self.PrimMotor.changeSpeed(int(data[3]/30*100)) 
                             self.secMotor1.changeSpeed(int(data[4]/12*100)) 
                             self.secMotor2.changeSpeed(int(data[5]/12*100))
@@ -210,7 +212,7 @@ class BallSpinnerController():
 
     '''
 
-    async def tCPscanAll(self) -> dict:
+    async def tCPscanAll(self):
         
         availDevices = {}
         smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
@@ -246,14 +248,12 @@ class BallSpinnerController():
                                         int(address[6:8],16),
                                         int(address[8:10],16),
                                         int(address[10:12],16)])
-                    print(bytes(bytesData).hex())
+                    print(bytesData)
                     self.commsChannel.send(bytesData)
                     
 
         except asyncio.CancelledError: #Called when KeyInterrut ^C is called
             BleScanner.stop()
-            return availDevices
-
 
 #Scans all modules to see which to connect to
 async def scanAll() -> dict:
@@ -342,4 +342,4 @@ myBallz.smartDot.startMag(100, 10)
 myBallz.smartDotHandler()
 '''
 
-BallSpinnerController()
+#BallSpinnerController()

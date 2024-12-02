@@ -95,8 +95,13 @@ class MetaMotion(iSmartDot):
         zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+        try: ## Check if TCP connection is set up, if not, just print in terminal
+            self.gyroDataSig(mess)
+            print("Encoded Data " + xValInBytes + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
-        self.gyroDataSig(mess)
+        except:
+            print(parsedData)
+            
 
 
     def startMag(self,  dataRate : int, odr : None):  

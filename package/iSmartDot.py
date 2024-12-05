@@ -16,7 +16,36 @@ class iSmartDot(metaclass=ABCMeta):
     @abstractmethod
     def disconnect(MAC_Address):
         pass
+    
+    def setDataSignals(self, accelDataSig, gyroDataSig, magDataSig):
+        self.accelDataSig =  accelDataSig
+        self.gyroDataSig = gyroDataSig
+        self.magDataSig = magDataSig
 
+    @abstractmethod
+    def startMag(self,  dataRate : int, odr : None):   
+        pass
+
+    @abstractmethod
+    def stopMag(self):
+        pass
+
+    @abstractmethod
+    def startAccel(self, dataRate : int, range : int):
+        pass
+
+    @abstractmethod
+    def stopAccel(self):
+        pass
+
+    @abstractmethod
+    def startGyro(self, dataRate : int, range : int):
+        pass
+
+    @abstractmethod
+    def stopGyro(self):
+        pass
+    
     @abstractmethod
     def UUID(self) -> str: ...
     # Scan Bluetooth Devices and filters for specific devices

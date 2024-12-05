@@ -57,6 +57,7 @@ class MetaMotion(iSmartDot):
     
     def accelDataHandler(self, ctx, data): 
         self.AccelSampleCount += 1   
+
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp()
         

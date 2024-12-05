@@ -1,4 +1,4 @@
-from package import *
+from BallSpinnerController import *
 import unittest
 import struct
 import asyncio

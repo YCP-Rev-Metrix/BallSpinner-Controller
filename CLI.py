@@ -1,26 +1,66 @@
-from .ConnectionTools import scanAll
-from .MetaMotion import MetaMotion
-from .Motor import Motor
+from package.iSmartDot import iSmartDot
+from package.MetaMotion import MetaMotion
+from package.SmartDotEmulator import SmartDotEmulator
+from package.Motor import Motor
+from mbientlab.warble import BleScanner
+import six
 import time
 import asyncio
 
 class CLI:
-    def smartDotCLI():
+    async def scanAll(self) -> dict:
+    
+        availDevices = {}
+        smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
+
+        #self.mode = "Scanning"
+        selection = -1
+        #Continuously rescans for MetaWear Devices
+        print("scanning for devices...")
+
+        #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
+        def handler(result):
+            for listedConnect in range(len(smartDot)):
+                if result.has_service_uuid(smartDot[listedConnect].UUID()):
+                    availDevices[result.mac] = result.name
+
+        BleScanner.set_handler(handler)
+        BleScanner.start()
+        
+        try :
+            i = 0
+            while True: 
+                #update list every 5s
+                await asyncio.sleep(1.0)  
+
+                #print all BLE devices found and append to connectable list                
+                count = 0
+                for address, name in six.iteritems(availDevices):
+                    if count >= i :
+                        print("[%d] %s (%s)" % (i, address, name))
+                        i += 1
+                    count += 1
+
+        except : #Called when KeyInterrut ^C is called
+            BleScanner.stop()
+            return availDevices
+
+    def smartDotCLI(self):
         print("Starting Connection to SmartDot Module")
         print("Press ^C to Stop Scanning SmartDot Module")
-        availDevices = asyncio.run(scanAll())
+        availDevices = asyncio.run(self.scanAll())
         print("Select SmartDot to Connect to:")
         consInput = input()
-        smartDot = MetaMotion.MetaMotion()
+        smartDot = MetaMotion()
         smartDotConnect = smartDot.connect(tuple(availDevices.keys())[int(consInput)])
         # Connect to Selected SmartDot Module
         while not smartDotConnect:
             print("Unable to Connect to ")
             print("Press ^C to Stop Scanning SmartDot Module")
-            availDevices = asyncio.run(scanAll())
+            availDevices = asyncio.run(self.scanAll())
             print("Select SmartDot to Connect to:")
             consInput = input()
-            smartDot = MetaMotion.MetaMotion(tuple(availDevices.keys())[int(consInput)])
+            smartDot = MetaMotion(tuple(availDevices.keys())[int(consInput)])
 
         while(consInput != 'E'):
             print("----------------------")
@@ -112,7 +152,7 @@ class CLI:
             else:
                 print("Invalid Input, Please Try Again\n")
 
-    def motorCLI():
+    def motorCLI(self):
         print("----------------------")
         print("What Are you doing with the motors (Motors will turn of on Exit)")
         consInput = ""
@@ -148,31 +188,7 @@ class CLI:
                 consInput = input()
                 motors[int(motorNum)].changeSpeed(int(consInput))
 
-            '''
-            print("----------------------")
-            print("Choose your function:")
-            print("[1] Start Motor")
-            print("[2] Stop Motor")
-            print('[3] Change Speed of Motor')
-            print('[E] Exit')
-            consInput = input()
-
-            if consInput == "1":
-                motor.turnOnMotor()
-                
-            elif consInput == "2":
-                motor.turnOffMotor()
-
-            elif consInput == "3":
-                print("Select Speed Between 0% - 100%")
-                consInput = input()
-                motor.changeSpeed(int(consInput))
-                
-            elif consInput == "E":
-                pass
-            '''
-
-    def __init__():
+    def __init__(self):
         consInput = ""
         print("Ball Spinner Controller UI:")
         print("Which Part Are You Interacting With?")
@@ -185,12 +201,12 @@ class CLI:
             consInput = input()
 
             if consInput == '1':
-                smartDotCLI()
+                self.smartDotCLI()
             elif consInput == '2':
-                motorCLI()
+                self.motorCLI()
             elif consInput == 'E':
                 pass
             else:
                 print("Invalid Input, Please Try Again\n")
 
-    
+CLI()

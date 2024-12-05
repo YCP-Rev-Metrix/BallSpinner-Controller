@@ -63,18 +63,18 @@ class BallSpinnerController():
         def accelDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x8A, 0x00, 0x13, 0x41])
             bytesData.extend(dataBytes)
-            #self.commsChannel.sendall(bytesData)
+            self.commsChannel.sendall(bytesData)
 
         def magDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x8A, 0x00, 0x13, 0x4D])
             bytesData.extend(dataBytes)
-            #self.commsChannel.sendall(bytesData)
+            self.commsChannel.sendall(bytesData)
         
         def gyroDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x8A, 0x00, 0x13, 0x47])
             bytesData.extend(dataBytes)
             self.commsChannel.sendall(bytesData)
-            print("Gyroscope: " + (dataBytes.hex()))
+            
 
 
         self.smartDot.setDataSignals(accelDataSignal, magDataSignal, gyroDataSignal)
@@ -121,7 +121,7 @@ class BallSpinnerController():
 
                         case(0x83):
                             print("Looking For Pi")
-                            name : str = "MyBallz"
+                            name : str = "Ball Spinner Controller"
                             bytesData =bytearray([0x84, 0x00, name.__len__()])
                             bytesData.extend(name.encode("utf-8"))
                             print(bytes(bytesData))
@@ -135,23 +135,31 @@ class BallSpinnerController():
                             if data[3:9].hex() == "000000000000":
                                 print("TRUEEEEE")
                                 self.mode = BSCModes.BLUETOOTH_SCANNING
-                                self.scanner = asyncio.create_task(self.tCPscanAll())
+                                self.scanner = asyncio.create_task(self.tCPscanAll(1))
                                 print("Connecting to \"SmartDot\"")
                             #Keep Trying to connect to Module in Presentation Ball
                             else:
                                 self.scanner.cancel()
-                                self.smartDot = None
-                                self.smartDot = MetaMotion()
+                                self.smartDot : iSmartDot = None
+                                
                                 smartDotMACStr = "%s:%s:%s:%s:%s:%s" % (data[3:4].hex(), 
                                 data[4:5].hex(), data[5:6].hex(), data[6:7].hex(), data[7:8].hex(), 
                                 data[8:9].hex())  
+                                if self.availDevicesType[smartDotMACStr] == SmartDotEmulator:
+                                    print("Simulator Selected")
+                                    self.smartDot = SmartDotEmulator()
+                                else: 
+                                    print("Womp Womp") 
+                                    self.smartDot = MetaMotion()
                                 print("Connecting to "+ smartDotMACStr)
                                 print(smartDotMACStr)
-                                if not self.smartDot.connect(smartDotMACStr) :   
+                                if not self.smartDot.connect(smartDotMACStr):   
                                     self.smartDot = None
+
                                 
-                                #NEED TO MAKE VARIABLE
-                                bytesData = bytearray([0x86, 0x00, 0x06,  0xC8, 0x30, 0x26, 0x28, 0x92, 0x4A]) 
+                                #NEED TO CHECK IF NOT TRUE, SEND ERROR
+                                bytesData = bytearray([0x86, 0x00, 0x06])
+                                bytesData.extend(data[4:9]) 
                                 print(bytes(bytesData))
                                 self.commsChannel.send(bytesData)
                                 self.mode = BSCModes.READYFORINSTRUCTIONS
@@ -212,13 +220,12 @@ class BallSpinnerController():
 
     '''
 
-    async def tCPscanAll(self):
-        
-        availDevices = {}
+    async def tCPscanAll(self, debugMode):
+        self.availDevices = {}
+        #Save the Class that each SmartDot is Associated with
+        self.availDevicesType = {}
         smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
 
-        #self.mode = "Scanning"
-        selection = -1
         #Continuously rescans for MetaWear Devices
         print("scanning for devices...")
 
@@ -226,7 +233,11 @@ class BallSpinnerController():
         def handler(result):
             for listedConnect in range(len(smartDot)):
                 if result.has_service_uuid(smartDot[listedConnect].UUID()):
-                    availDevices[result.mac] = result.name
+                    self.availDevices[result.mac] = result.name
+
+        if(debugMode):
+            self.availDevices["11:11:11:11:11:11"] = "smartDotSimulator" 
+            self.availDevicesType["11:11:11:11:11:11"] = SmartDotEmulator
 
         BleScanner.set_handler(handler)
         BleScanner.start()
@@ -239,7 +250,7 @@ class BallSpinnerController():
 
                 #print all BLE devices found and append to connectable list                
                 count = 0
-                for address, name in six.iteritems(availDevices):
+                for address, name in six.iteritems(self.availDevices):
                     address = address.replace(":", "")
                     bytesData = bytearray([0x86, 0x00, 0x06, 
                                         int(address[0:2],16),
@@ -248,6 +259,8 @@ class BallSpinnerController():
                                         int(address[6:8],16),
                                         int(address[8:10],16),
                                         int(address[10:12],16)])
+                    name : str
+                    bytesData.extend(name.encode("utf-8"))
                     print(bytesData)
                     self.commsChannel.send(bytesData)
                     
@@ -292,44 +305,6 @@ async def scanAll() -> dict:
     except : #Called when KeyInterrut ^C is called
         BleScanner.stop()
         return availDevices
-
-async def scanAll() -> dict:
-    
-    availDevices = {}
-    smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
-
-    #self.mode = "Scanning"
-    selection = -1
-    #Continuously rescans for MetaWear Devices
-    print("scanning for devices...")
-
-    #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
-    def handler(result):
-        for listedConnect in range(len(smartDot)):
-            if result.has_service_uuid(smartDot[listedConnect].UUID()):
-                availDevices[result.mac] = result.name
-
-    BleScanner.set_handler(handler)
-    BleScanner.start()
-    
-    try :
-        i = 0
-        while True: 
-            #update list every 5s
-            await asyncio.sleep(1.0)  
-
-            #print all BLE devices found and append to connectable list                
-            count = 0
-            for address, name in six.iteritems(availDevices):
-                if count >= i :
-                    print("[%d] %s (%s)" % (i, address, name))
-                    i += 1
-                count += 1
-
-    except : #Called when KeyInterrut ^C is called
-        BleScanner.stop()
-        return availDevices
-
 '''
 availDevices = asyncio.run(scanAll())
 smartDot = MetaMotion()

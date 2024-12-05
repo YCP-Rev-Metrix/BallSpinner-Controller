@@ -1,3 +1,3 @@
-from package.ConnectionTools import BallSpinnerController
+from BallSpinnerController.ConnectionTools import BallSpinnerController
 
 BallSpinnerController()

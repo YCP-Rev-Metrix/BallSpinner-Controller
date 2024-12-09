@@ -26,10 +26,10 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
         libmetawear.mbl_mw_mag_bmm150_enable_b_field_sampling(self.device.board)
         self.startMagTime = datetime.now()
         
-        #Create fake data handler to pass into accelSignal        
         
     def _testHandler(self, ctx, data):    
-        
+        #Create fake data handler to pass into accelSignal        
+
         def test(mess):
             try:
                 pasedData = parse_value(data)

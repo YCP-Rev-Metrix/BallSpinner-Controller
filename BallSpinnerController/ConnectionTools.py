@@ -32,14 +32,12 @@ class BallSpinnerController():
 
     def __init__(self):
     
-        self.currThread = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.currThread)
-        
+        #determine global ip address
+        self.iSmartDot = None
         self.mode : BSCModes = BSCModes.WAITING_FOR_APP_INITILIZATION
 
         ipAddr = None
         
-        #determine global ip address
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
@@ -55,17 +53,12 @@ class BallSpinnerController():
         print('Server listening on {}:{}'.format(*server_address))
         self.commsPort.bind(server_address)
 
-        #wait for a devrootce to attempt TCP connection to Port
+        #wait for a device to attempt TCP connection to Port
         self.commsPort.listen(1)
         self.commsChannel, clientIp  = self.commsPort.accept()
-        print("Done Listening")
-
+        
         self.commsChannel.setblocking(True)
-
-        threading.Thread(target=self.startCommsHandlerThread, daemon=True).start()
-        sleep(999)
-
-        print("Process Ended By Application")     
+        asyncio.run(self.commsHandler())    
 
     def startCommsHandlerThread(self):
         loop = asyncio.new_event_loop()

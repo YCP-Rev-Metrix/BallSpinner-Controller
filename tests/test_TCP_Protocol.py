@@ -86,13 +86,14 @@ class ProtocolTests(unittest.TestCase):
 
 
         print(data)
-        self.commsPort.sendall(bytearray[0x88, 0x00, 0x03, 0x0A, 0x0A, 0x0A])
+        self.commsPort.sendall(bytearray([0x88, 0x00, 0x03, 0x0A, 0x0A, 0x0A]))
 
         print(self.commsPort.recv(1024))
 
         while True:
             data = self.commsPort.recv(1024)
             if not data == b'':
+                print("TEST RECEIVED:")
                 print(data)
                 pass
 

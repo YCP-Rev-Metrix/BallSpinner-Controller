@@ -72,7 +72,8 @@ class MetaMotion(iSmartDot):
         try: ## Check if TCP connection is set up, if not, just print in terminal
             self.accelDataSig(mess)
             print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
-        except:
+
+        except:    
             print(parsedData)
 
 
@@ -87,7 +88,14 @@ class MetaMotion(iSmartDot):
         zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
-        self.magDataSig(mess)
+        try:
+            self.magDataSig(mess)
+            print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+        except BrokenPipeError:
+            raise RuntimeError
+
+        except Exception as e:
+            print(f"Unexpected error in accelDataHandler: {e}")
 
     def gyroDataHandler(self, ctx, data):
         parsedData = parse_value(data)
@@ -104,6 +112,11 @@ class MetaMotion(iSmartDot):
             self.gyroDataSig(mess)
             print("Encoded Data " + xValInBytes + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
+        except BrokenPipeError:
+            raise
+
+        except Exception as e:    
+            raise
         except:
             print(parsedData)
             
@@ -129,8 +142,8 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
         libmetawear.mbl_mw_datasignal_unsubscribe(self.magSignal)
         
-    def disconnect(MAC_Address):
-        return super().disconnect()
+    def disconnect(self):
+        self.device.disconnect()
       
     def startAccel(self, dataRate : int, range : int):
         

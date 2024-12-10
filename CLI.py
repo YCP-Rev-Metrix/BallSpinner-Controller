@@ -1,7 +1,7 @@
-from package.iSmartDot import iSmartDot
-from package.MetaMotion import MetaMotion
-from package.SmartDotEmulator import SmartDotEmulator
-from package.Motor import Motor
+from BallSpinnerController.iSmartDot import iSmartDot
+from BallSpinnerController.MetaMotion import MetaMotion
+from BallSpinnerController.SmartDotEmulator import SmartDotEmulator
+from BallSpinnerController.Motor import Motor
 from mbientlab.warble import BleScanner
 import six
 import time

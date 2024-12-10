@@ -10,7 +10,7 @@ from datetime import datetime
 class MetaMotion_Mag_Tests(unittest.TestCase):
     def setUp(self):
         print("Setting Up MetaMotion Connection")
-        availDevices = asyncio.run(ConnectionTools.scanAll())
+        availDevices = asyncio.run(BallSpinnerController.scanAll())
         self.smartDot = MetaMotion()
         print("Select SmartDot To Connect To")
         consInput = input()

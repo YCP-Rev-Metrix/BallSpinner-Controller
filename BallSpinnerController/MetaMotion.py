@@ -39,7 +39,7 @@ class MetaMotion(iSmartDot):
         print(MAC_Address)
         try:
             self.device = MetaWear(MAC_Address)
-            cnnected = self.device.connect()
+            self.device.connect()
             #set connection parameters 7.5ms connection interval, 0 Slave interval, 6s timeout
             libmetawear.mbl_mw_settings_set_connection_parameters(self.device.board, 7.5, 7.5, 0, 6000)
             
@@ -69,8 +69,12 @@ class MetaMotion(iSmartDot):
         
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
 
+        try: ## Check if TCP connection is set up, if not, just print in terminal
+            self.accelDataSig(mess)
+            print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+        except:
+            print(parsedData)
 
-        self.accelDataSig(mess)
 
     def magDataHandler(self, ctx, data):
         parsedData = parse_value(data)
@@ -168,9 +172,9 @@ class MetaMotion(iSmartDot):
         # Write the changes to the sensor
         libmetawear.mbl_mw_gyro_bmi160_write_config(self.device.board)
 
-        gyro = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(self.device.board)
+        self.gyroSig = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(self.device.board)
 
-        libmetawear.mbl_mw_datasignal_subscribe(gyro, None, self.gyroCallback)
+        libmetawear.mbl_mw_datasignal_subscribe(self.gyroSig, None, self.gyroCallback)
         libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.device.board)
         
         self.startGyroTime = datetime.now()
@@ -179,9 +183,10 @@ class MetaMotion(iSmartDot):
 
 
     def stopGyro(self):
+        print("Stopping Gyroscope Sampling")
         libmetawear.mbl_mw_gyro_bmi160_stop(self.device.board)
         libmetawear.mbl_mw_gyro_bmi160_disable_rotation_sampling(self.device.board)
-        libmetawear.mbl_mw_datasignal_unsubscribe(self.gyroCallback)
+        libmetawear.mbl_mw_datasignal_unsubscribe(self.gyroSig)
         
     def turnOnRedLED(self):
         pattern = LedPattern(delay_time_ms= 5000, repeat_count= Const.LED_REPEAT_INDEFINITELY)

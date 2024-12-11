@@ -2,6 +2,7 @@ from __future__ import print_function
 from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
 from mbientlab.warble import * 
+import time
 from time import sleep
 from threading import Event
 import struct
@@ -59,7 +60,7 @@ class MetaMotion(iSmartDot):
         self.AccelSampleCount += 1   
 
         parsedData = parse_value(data)
-        timeStamp = datetime.now().timestamp()
+        timeStamp = datetime.now().timestamp() - self.startAccelTime
         
         sampleCountInBytes = struct.pack('>I',self.AccelSampleCount )[1:4]
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
@@ -79,8 +80,7 @@ class MetaMotion(iSmartDot):
 
     def magDataHandler(self, ctx, data):
         parsedData = parse_value(data)
-        timeStamp = datetime.now().timestamp()
-        
+        timeStamp = datetime.now().timestamp() - self.startMagTime
         sampleCountInBytes = struct.pack('>I',self.MagSampleCount )[1:4]
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
@@ -91,17 +91,15 @@ class MetaMotion(iSmartDot):
         try:
             self.magDataSig(mess)
             print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
-        except BrokenPipeError:
-            raise RuntimeError
-
         except Exception as e:
             print(f"Unexpected error in accelDataHandler: {e}")
 
     def gyroDataHandler(self, ctx, data):
         parsedData = parse_value(data)
-        timeStamp = datetime.now().timestamp()
-        
+        timeStamp = datetime.now().timestamp() - self.startGyroTime
+
         sampleCountInBytes = struct.pack('>I',self.GyroSampleCount )[1:4]
+        self.GyroSampleCount+=1
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
         yValInBytes : bytearray = struct.pack('<f', parsedData.y)
@@ -110,7 +108,7 @@ class MetaMotion(iSmartDot):
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
         try: ## Check if TCP connection is set up, if not, just print in terminal
             self.gyroDataSig(mess)
-            print("Encoded Data " + xValInBytes + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            #print("Encoded Data " + xValInBytes + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
         except BrokenPipeError:
             raise
@@ -133,7 +131,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.magCallback)
 
         libmetawear.mbl_mw_mag_bmm150_enable_b_field_sampling(self.device.board)
-        self.startMagTime = datetime.now()
+        self.startMagTime = datetime.now().timestamp()
         libmetawear.mbl_mw_mag_bmm150_start(self.device.board)
         self.MagSampleCount = 0
 
@@ -162,7 +160,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_acc_enable_acceleration_sampling(self.device.board)
         
         if(self.accelSignal != None):
-            self.startAccelTime = datetime.now()
+            self.startAccelTime = datetime.now().timestamp()
             libmetawear.mbl_mw_acc_start(self.device.board)
         else:
             print("Unable to Start Polling Data: Acceleration Not Enabled")
@@ -175,7 +173,6 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_datasignal_unsubscribe(self.accelSignal)
     
     def startGyro(self, dataRate : int, range : int):
-            
         # Set ODR to 100Hz
         libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, GyroBoschOdr._100Hz)
 
@@ -190,7 +187,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_datasignal_subscribe(self.gyroSig, None, self.gyroCallback)
         libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.device.board)
         
-        self.startGyroTime = datetime.now()
+        self.startGyroTime = datetime.now().timestamp()
         libmetawear.mbl_mw_gyro_bmi160_start(self.device.board)
         self.GyroSampleCount = 0
 

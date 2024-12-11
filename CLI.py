@@ -177,7 +177,7 @@ class CLI:
             elif motors.__getitem__(int(motorNum)) == None:
                 print("Which Pin is the Motor Connected To?")
                 consInput = input()
-                motors[int(motorNum)] = Motor.Motor(int(consInput))
+                motors[int(motorNum)] = Motor(int(consInput))
             
             elif not motors.__getitem__(int(motorNum)).state:
                 motors[int(motorNum)].turnOnMotor()

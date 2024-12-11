@@ -10,7 +10,8 @@ class SmartDotEmulator(iSmartDot):
 
     def __init__(self):
         # Start the task with the current event loop
-        self.loop = asyncio.get_event_loop()
+        self.loop = asyncio.new_event_loop()
+
 
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75b"
@@ -22,9 +23,12 @@ class SmartDotEmulator(iSmartDot):
         try:
             csvFile = open('data/SmartDotEmulatorData.csv', 'r') 
             self.smartDotData = csvFile.readlines()
+        except:
+            return False
+        
         finally: 
             csvFile.close()
-            print(self.smartDotData)
+            print("SmartDotEmulator: CSV File stored locally")
         
         return True  
         

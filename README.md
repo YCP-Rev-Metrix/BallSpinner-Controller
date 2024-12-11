@@ -39,7 +39,10 @@ Pre-Requesites
             sudo python -m package.tests.ProtocolTests
             '''
 
+Run BSC Code: sudo python main.py
 Run Test Code: sudo python -m package.tests.ProtocolTests
+Run all tests: sudo python -m unittest discover -s tests
+
 
 current dependencies
 BlueZ - bluetoothd -v = 5.66

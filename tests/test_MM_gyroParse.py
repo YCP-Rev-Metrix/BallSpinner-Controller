@@ -19,12 +19,22 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
         self.testCallback = FnVoid_VoidP_DataP(self._testHandler) #sets up Data Handler
 
         #configure Magnetometer
-        libmetawear.mbl_mw_mag_bmm150_set_preset(self.device.board, MagBmm150Preset.HIGH_ACCURACY)
-        self.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
-        libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.testCallback)
+            
+        # Set ODR to 100Hz
+        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, GyroBoschOdr._100Hz)
 
-        libmetawear.mbl_mw_mag_bmm150_enable_b_field_sampling(self.device.board)
-        self.startMagTime = datetime.now()
+        # Set data range to +/250 degrees per second
+        libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, 2)
+
+        # Write the changes to the sensor
+        libmetawear.mbl_mw_gyro_bmi160_write_config(self.device.board)
+
+        self.smartDot.gyroSig = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(self.device.board)
+
+        libmetawear.mbl_mw_datasignal_subscribe(self.smartDot.gyroSig, None, self.testCallback)
+        libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.device.board)
+        
+        
         
         
     def _testHandler(self, ctx, data):    
@@ -41,23 +51,33 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
                 bytesData.extend(mess)
                 self.assertTrue(0x8A == bytesData[0])
                 msgSize = int(struct.unpack(">I", b"\x00\x00"+ bytesData[1:3])[0])
+                    
                 self.assertTrue(0x0013 == msgSize)
                 #Tests if Sensor Type is Sent Correcty, in Testing it should be T for Test
+                self.count = int(struct.unpack('>I',b"\x00" + bytesData[4:7])[0])
+                                
+                timestamp = struct.unpack('<f', bytesData[7:11])[0]
+                print(timestamp)
+
                 self.assertTrue('T' == chr(bytesData[3]))
                 self.assertAlmostEqual(pasedData.x, struct.unpack('<f', bytesData[11:15])[0],delta=0.01)
                 self.assertAlmostEqual(pasedData.y, struct.unpack('<f', bytesData[15:19])[0],delta=0.01)
                 self.assertAlmostEqual(pasedData.z, struct.unpack('<f', bytesData[19:23])[0],delta=0.01)
+
             except AssertionError as e:
                 self.fail(f"{e}") #immediately call fail message
-        self.smartDot.magDataSig = test
-        self.smartDot.magDataHandler(ctx,data)
+
+        self.smartDot.gyroDataSig = test
+        self.smartDot.gyroDataHandler(ctx,data)
     
     def testDataParsing(self):    
-        print("Running Mag Parsing Tests For 10s")
-        libmetawear.mbl_mw_mag_bmm150_start(self.device.board)
-        self.smartDot.MagSampleCount = 0 
+        print("Running Gyro Parsing Tests For 10s")
+        libmetawear.mbl_mw_gyro_bmi160_start(self.device.board)
+        self.smartDot.startGyroTime = datetime.now().timestamp()
+        self.smartDot.GyroSampleCount = 0
+        
         asyncio.run(asyncio.sleep(10))
-        self.smartDot.stopMag()
+        self.smartDot.stopGyro()
         
 
 

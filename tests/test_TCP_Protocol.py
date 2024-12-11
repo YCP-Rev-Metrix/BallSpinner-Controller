@@ -20,32 +20,17 @@ class ProtocolTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         # Start the BallSpinnerController in a separate process
-        cls.bsc_process = multiprocessing.Process(target=cls.run_ball_spinner_controller)
+        cls.bsc_process = multiprocessing.Process(target=BallSpinnerController) 
         cls.bsc_process.start()
 
-        # Wait for the server to signal readiness
-        cls.ready_event.wait()  # Blocks until the event is set
-        sleep(2)
+        # Give time for BallSpinner 
+        sleep(.5)
 
-    @classmethod
-    def run_ball_spinner_controller(cls):
-        # Run the BallSpinnerController in a blocking manner
-        cls.ready_event.set()
-
-        
-        # Notify that the server is ready
-        BallSpinnerController()
-
-        
-
-
-    def test(self):
-        print("Ploop")
-        # Create a socket object#determine global ip address
+        #determine global ip address
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
-                ipAddr = s.getsockname()[0]
+                cls.ipAddr = s.getsockname()[0]
 
         except Exception:
             # ERROR: Not Connected to Internet
@@ -54,23 +39,32 @@ class ProtocolTests(unittest.TestCase):
         finally:
             s.close()
 
+    def _test_socket_Established(self):
         try:
                 # Create a client socket and connect to the server
-                    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
-                    server_ip = ipAddr  # Replace with the actual IP address
-                    server_port = 8411  # Replace with the actual port
                     
-                    client_socket.connect((server_ip, server_port))
-                    print("Connected to server")
-                    
-                    # Send and receive data
-                    client_socket.sendall(bytearray([0x81, 0x00, 0x01, 0x00]))
-                    response = client_socket.recv(1024)
-                    print("Received:", response)
-                    self.commsPort = client_socket
-                    
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+            server_ip = self.ipAddr  # Replace with the actual IP address
+            server_port = 8411  # Replace with the actual port
+        
+            print("Connecting")
+            client_socket.connect((server_ip, server_port))
+
+            print("Connected to server")
+            sleep(1)
+            # Send and receive data
+            client_socket.sendall(bytearray([0x81, 0x00, 0x01, 0x00]))
+            response = client_socket.recv(1024)
+            print("Received:", response)
+            self.commsPort = client_socket
+            
         except socket.error as e:
-            print("Socket error:", e)
+            self.fail(e)
+
+    def testBSC(self):
+        self._test_socket_Established()
+        #self._test_APP_INIT_ACK()
+        
 
         #Send BSC_NAME_REQ
         self.commsPort.sendall(bytearray([0x85, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))
@@ -81,22 +75,34 @@ class ProtocolTests(unittest.TestCase):
 
         bytesData = bytearray([0x85, 0x00, 0x06])
         bytesData.extend(data[3:9])
-        #Send Motor Instr
+
+        #Send SmartDot Data
         self.commsPort.sendall(bytesData)
 
+        #Receive Confirmation
+        print(self.commsPort.recv(1024))
 
-        print(data)
+        
         self.commsPort.sendall(bytearray([0x88, 0x00, 0x03, 0x0A, 0x0A, 0x0A]))
 
         print(self.commsPort.recv(1024))
 
-        while True:
+        #receive 10 data then stop
+        count = 0
+        while count <= 10:
             data = self.commsPort.recv(1024)
             if not data == b'':
                 print("TEST RECEIVED:")
                 print(data)
+                count += 1
                 pass
+        
+        self.commsPort.close()
+
+        self.commsPort.sendall(bytearray([0x8B]))
+        self.commsPort.recv(1024)
+
+        
 
     def tearDown(self):
-        asyncio.sleep(5000)
-        self.commsPort.close()
+        pass

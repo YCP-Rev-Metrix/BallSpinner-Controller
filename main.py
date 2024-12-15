@@ -1,0 +1,3 @@
+from BallSpinnerController.BallSpinnerController import BallSpinnerController
+
+BallSpinnerController()

@@ -1,4 +1,4 @@
-
+from time import sleep
 import RPi.GPIO as GPIO
 
 class Motor():
@@ -33,8 +33,16 @@ class Motor():
             print("Unable to Stop Motor: Motor is Not Running")
 
     def changeSpeed(self, dutyCycle : int):
+        print("Changing Speed %i%%" % dutyCycle)
         if self.state:
             self.PWM.ChangeDutyCycle(dutyCycle)
-            print(self.PWM)
+        
         else:
             print("Unable to Change Speed: Motor is Not Running")
+
+    def rampUp(self):
+        i = 0
+        while i/25 < 1:
+            i=i+1
+            self.changeSpeed(int((i/25)*100))
+            sleep(.5)

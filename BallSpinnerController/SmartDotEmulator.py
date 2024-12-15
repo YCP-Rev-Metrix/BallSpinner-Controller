@@ -7,18 +7,24 @@ from datetime import datetime
 import struct
 
 class SmartDotEmulator(iSmartDot):
+    #Value in Str because all MAC Adress checks use strings (Currently)
 
     def __init__(self):
         # Start the task with the current event loop
         self.loop = asyncio.new_event_loop()
+        self._MAC_ADDRESS = "11:11:11:11:11:11"
 
 
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75b"
     
     def connect(self, MAC_Address) -> bool:
-        print("Attempting to connect to device")
-        #Add check for CSV File
+        #Confirm the 
+        if not MAC_Address == self._MAC_ADDRESS:
+            print("SmartDot Emulator: Incorrect MAC Adress")
+            print("SmartDot Emulator: Expected 11:11:11:11:11 and got %s" % MAC_Address)
+            return False
+        print("SmartDotEmulator: Attempting open CSV data")
         # Open the CSV file
         try:
             csvFile = open('data/SmartDotEmulatorData.csv', 'r') 

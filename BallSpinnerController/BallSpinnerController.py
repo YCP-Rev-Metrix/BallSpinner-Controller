@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import subprocess
 from mbientlab.warble import BleScanner
 import six
 from .MetaMotion import MetaMotion
@@ -33,11 +34,22 @@ class BSCModes(Enum):
     
 class BallSpinnerController():
 
-    def __init__(self):
-    
+    def __init__(self, debug):
+        #Before Anything, Check if user has raised permissions
+        try:
+            #Manually Raise Permissiosn, if Possible
+            subprocess.check_call(['sudo', '-n', 'true'])
+        
+        except subprocess.CalledProcessError: #If not possible to run with admin permissions, 
+            raise PermissionError("Application Must Be Ran with Raised Permissions")
+
+        print(debug)
+        self.debug = (True if debug == "1" else False)
+        
         #determine global ip address
         self.iSmartDot = None
         
+        print("Debug Mode: ON" if self.debug else "Debug Mode: OFF")
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
@@ -136,7 +148,6 @@ class BallSpinnerController():
         await asyncio.sleep(9999)  # Or replace this with a condition/event loop
 
     async def commsHandler(self):
-            print("Comms Handler entered")
             loop = asyncio.get_event_loop()
             while True:
             #Read first message com
@@ -144,11 +155,11 @@ class BallSpinnerController():
                     data = await loop.run_in_executor(None, self.commsChannel.recv, 1024)
                     #parse message
                     if not data == b'':
-                        print(data)
+                        print(data.hex() if not self.debug else "")
                         match data[0]: 
                             case(0x81): #APP_INIT Message
                                 #Message Received: | Mess Type: 0x81 | Mess Size: 0x0001 | RandomByte: XXXX 
-                                print("Message Type: App Sending Start Message")
+                                print("Message Type: App Sending Start Message") if self.debug else None
                                 if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
                                     #Send Error: Already Connected to Application
 
@@ -181,7 +192,7 @@ class BallSpinnerController():
                                 if data[3:9].hex() == "000000000000":
                                     print("TRUEEEEE")
                                     self.mode = BSCModes.BLUETOOTH_SCANNING
-                                    self.scanner = asyncio.create_task(self.tCPscanAll(0))
+                                    self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
                                     print("Connecting to \"SmartDot\"")
                                 #Keep Trying to connect to Module in Presentation Ball
                                 else:

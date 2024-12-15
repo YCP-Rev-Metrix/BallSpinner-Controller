@@ -43,13 +43,12 @@ class BallSpinnerController():
         except subprocess.CalledProcessError: #If not possible to run with admin permissions, 
             raise PermissionError("Application Must Be Ran with Raised Permissions")
 
-        print(debug)
         self.debug = (True if debug == "1" else False)
         
         #determine global ip address
         self.iSmartDot = None
         
-        print("Debug Mode: ON" if self.debug else "Debug Mode: OFF")
+        print("Debug Mode: ON") if self.debug else None 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
@@ -186,7 +185,7 @@ class BallSpinnerController():
                                 self.mode = BSCModes.IDLE
                                 pass
                             
-                            case(0x85): #BSC_NAME Message
+                            case(0x85): #SMARTDOT_SCAN Message
                                 print(data[3:9].hex())
                                 #If the 
                                 if data[3:9].hex() == "000000000000":
@@ -301,15 +300,23 @@ class BallSpinnerController():
                 #print all BLE devices found and append to connectable list                
                 count = 0
                 for address, name in six.iteritems(self.availDevices):
+                    name : str
                     address = address.replace(":", "")
-                    bytesData = bytearray([0x86, 0x00, 0x06, 
+
+                    #Pack Message So Lenght fits in 2 bytes
+                    messLen = struct.pack(">I", (6 + name.__len__()))[2:4]
+                    bytesData = bytearray([0x86])
+                    print("Passed") #delete
+                    bytesData.extend(messLen) 
+                    print("Passed2") #delete
+                    bytesData.extend(bytearray([                    
                                         int(address[0:2],16),
                                         int(address[2:4],16),
                                         int(address[4:6],16),
                                         int(address[6:8],16),
                                         int(address[8:10],16),
-                                        int(address[10:12],16)])
-                    name : str
+                                        int(address[10:12],16)]))
+                                        
                     bytesData.extend(name.encode("utf-8"))
                     print(self.commsChannel.send(bytesData))
                     

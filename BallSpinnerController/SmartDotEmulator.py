@@ -3,7 +3,7 @@ from mbientlab.metawear import MetaWear
 from mbientlab.warble import WarbleException
 import asyncio
 from datetime import datetime
-
+from time import sleep
 import struct
 
 class SmartDotEmulator(iSmartDot):
@@ -41,10 +41,11 @@ class SmartDotEmulator(iSmartDot):
     def disconnect(MAC_Address):
         return super().disconnect()
     
-    async def my_handler(self, dataRate, type):
+    def my_handler(self, dataRate, type):
+        "Handler Called"
         count = 1
         sleepPeriod = 1/dataRate
-        while True:
+        while self.sendingGyroData:
             
             sampleCountInBytes = struct.pack('>I', count)[1:4]
             timeStampInBytes : bytearray = struct.pack("<f", datetime.now().timestamp())
@@ -62,11 +63,14 @@ class SmartDotEmulator(iSmartDot):
 
             print("SmartDotEmulator: %lf, %lf, %lf" % (sensorXValue, sensorYValue, sensorZValue))
             count+=1
-            if type == "Gyroscope":
-                self.gyroDataSig(mess)
-                #print("Mess Sent: " + mess.hex())
+            if type == "Gyroscope":   
+                print(self.gyroDataSig) #delee
+                try: ## Check if TCP connection is set up, if not, just print in terminal
+                    print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+                except:
+                    print("Mess Sent: " + mess.hex())
 
-            await asyncio.sleep(sleepPeriod)
+            sleep(sleepPeriod)
 
     def startMag(self,  dataRate : int, odr : None):   
         # Run the event loop
@@ -82,10 +86,12 @@ class SmartDotEmulator(iSmartDot):
         pass
 
     def startGyro(self, dataRate : int, range : int):
+        self.sendingGyroData = True
         self.loop.create_task(self.my_handler(dataRate, "Gyroscope"))  # Schedule the handler           
+        
 
 
     def stopGyro(self):
-        pass
+        self.sendingGyroData = False
     
         

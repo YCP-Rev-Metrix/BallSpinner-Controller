@@ -37,9 +37,9 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
                 self.assertAlmostEqual(pasedData.y, struct.unpack('<f', mess[11:15])[0],delta=0.01)
                 self.assertAlmostEqual(pasedData.z, struct.unpack('<f', mess[15:19])[0],delta=0.01)
                 #Can't find any other way to call code from BSC so its copied pasted below:
-                bytesData = bytearray([0x8A, 0x00, 0x13, 0x54])
+                bytesData = bytearray([0x0A, 0x00, 0x13, 0x54])
                 bytesData.extend(mess)
-                self.assertTrue(0x8A == bytesData[0])
+                self.assertTrue(0x0A == bytesData[0])
                 msgSize = int(struct.unpack(">I", b"\x00\x00"+ bytesData[1:3])[0])
                 self.assertTrue(0x0013 == msgSize)
                 #Tests if Sensor Type is Sent Correcty, in Testing it should be T for Test

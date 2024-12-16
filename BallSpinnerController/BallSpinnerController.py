@@ -91,7 +91,7 @@ class BallSpinnerController():
     async def smartDotHandler(self):
         print("Handling SmartDot:")
         def accelDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x8A, 0x00, 0x13, 0x41])
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x41])
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
@@ -105,7 +105,7 @@ class BallSpinnerController():
                 raise BrokenPipeError
 
         def magDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x8A, 0x00, 0x13, 0x4D])
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x4D])
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
@@ -118,7 +118,7 @@ class BallSpinnerController():
                 asyncio.run_coroutine_threadsafe(brokenPipeErrorThrower, asyncio.get_event_loop())
         
         def gyroDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x8A, 0x00, 0x13, 0x47])
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x47])
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
@@ -156,8 +156,8 @@ class BallSpinnerController():
                     if not data == b'':
                         print(data.hex() if not self.debug else "")
                         match data[0]: 
-                            case(0x81): #APP_INIT Message
-                                #Message Received: | Mess Type: 0x81 | Mess Size: 0x0001 | RandomByte: XXXX 
+                            case(0x01): #APP_INIT Message
+                                #Message Received: | Mess Type: 0x01 | Mess Size: 0x0001 | RandomByte: XXXX 
                                 print("Message Type: App Sending Start Message") if self.debug else None
                                 if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
                                     #Send Error: Already Connected to Application
@@ -166,26 +166,26 @@ class BallSpinnerController():
                                     pass
                                 else:
                                     # Confirm Communications are established and send confirmation signal
-                                    #| Mess Type: 0x82 | Mess Size: 0x0001 | RandomByte: XXXX 
+                                    #| Mess Type: 0x02 | Mess Size: 0x0001 | RandomByte: XXXX 
                                     
                                     #Grab Random Byte from third and resend
-                                    bytesData = bytearray([0x82, 0x00, 0x01, data[3]]) 
+                                    bytesData = bytearray([0x02, 0x00, 0x01, data[3]]) 
                                     #bytesData.append(data[2])
                                     #print(bytes(bytesData))
                                     self.commsChannel.send(bytesData)
                                     self.mode = BSCModes.IDLE
 
-                            case(0x83): #BSC_NAME_REQ Message
+                            case(0x03): #BSC_NAME_REQ Message
                                 print("Looking For Pi")
                                 name : str = "Ball Spinner Controller"
-                                bytesData =bytearray([0x84, 0x00, name.__len__()])
+                                bytesData =bytearray([0x04, 0x00, name.__len__()])
                                 bytesData.extend(name.encode("utf-8"))
                                 print(bytes(bytesData))
                                 self.commsChannel.send(bytesData)
                                 self.mode = BSCModes.IDLE
                                 pass
                             
-                            case(0x85): #SMARTDOT_SCAN Message
+                            case(0x05): #SMARTDOT_SCAN Message
                                 print(data[3:9].hex())
                                 #If the 
                                 if data[3:9].hex() == "000000000000":
@@ -218,13 +218,13 @@ class BallSpinnerController():
                                         self.smartDot = None
                                     
                                     #NEED TO CHECK IF NOT TRUE, SEND ERROR
-                                    bytesData = bytearray([0x86, 0x00, 0x06])
+                                    bytesData = bytearray([0x06, 0x00, 0x06])
                                     bytesData.extend(data[4:9]) 
                                     print(bytes(bytesData))
                                     self.commsChannel.send(bytesData)
                                     self.mode = BSCModes.READY_FOR_INSTRUCTIONS
     
-                            case(0x88): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
+                            case(0x08): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 
                                     print("Initializing Sensors")
@@ -248,7 +248,7 @@ class BallSpinnerController():
                                 self.secMotor1.changeSpeed(int(data[4]/12*100)) 
                                 self.secMotor2.changeSpeed(int(data[5]/12*100))
 
-                            case(0x8B): #STOP_MOTOR_INSTRUCTIONS
+                            case(0x0B): #STOP_MOTOR_INSTRUCTIONS
                                 if self.mode == BSCModes.TAKING_SHOT_DATA:
                                     #Stop Motors
 
@@ -305,10 +305,8 @@ class BallSpinnerController():
 
                     #Pack Message So Lenght fits in 2 bytes
                     messLen = struct.pack(">I", (6 + name.__len__()))[2:4]
-                    bytesData = bytearray([0x86])
-                    print("Passed") #delete
+                    bytesData = bytearray([0x06])
                     bytesData.extend(messLen) 
-                    print("Passed2") #delete
                     bytesData.extend(bytearray([                    
                                         int(address[0:2],16),
                                         int(address[2:4],16),

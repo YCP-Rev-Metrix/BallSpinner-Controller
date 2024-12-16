@@ -1,7 +1,7 @@
 from .iSmartDot import iSmartDot
 from mbientlab.metawear import MetaWear
 from mbientlab.warble import WarbleException
-import asyncio
+import threading
 from datetime import datetime
 from time import sleep
 import struct
@@ -11,9 +11,7 @@ class SmartDotEmulator(iSmartDot):
 
     def __init__(self):
         # Start the task with the current event loop
-        self.loop = asyncio.new_event_loop()
         self._MAC_ADDRESS = "11:11:11:11:11:11"
-
 
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75b"
@@ -41,8 +39,63 @@ class SmartDotEmulator(iSmartDot):
     def disconnect(MAC_Address):
         return super().disconnect()
     
-    def my_handler(self, dataRate, type):
-        "Handler Called"
+    def accelHandler(self, dataRate):
+        count = 1
+        sleepPeriod = 1/dataRate
+        while self.sendingAccelData:
+            
+            sampleCountInBytes = struct.pack('>I', count)[1:4]
+            timeStampInBytes : bytearray = struct.pack("<f", datetime.now().timestamp())
+
+            sensorXValue = float(self.smartDotData[count % self.smartDotData.__sizeof__()].strip().split(',')[1])
+            sensorYValue = float(self.smartDotData[count % self.smartDotData.__sizeof__()].strip().split(',')[2])
+            sensorZValue = float(self.smartDotData[count % self.smartDotData.__sizeof__()].strip().split(',')[3])
+
+            xValInBytes : bytearray = struct.pack('<f', sensorXValue) 
+            yValInBytes : bytearray = struct.pack('<f', sensorYValue)
+            zValInBytes : bytearray = struct.pack('<f', sensorZValue)
+        
+            
+            mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+
+            print("SmartDotEmulator: %lf, %lf, %lf" % (sensorXValue, sensorYValue, sensorZValue))
+            count+=1
+            try: ## Check if TCP connection is set up, if not, just print in terminal
+                self.accelDataSig(mess)
+                print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex()) #Not with SME Prefix because ALL iSmartDot classes print this
+            except:
+                print("Mess Sent: " + mess.hex())
+            sleep(sleepPeriod)
+
+    def magHandler(self, dataRate):
+        count = 1
+        sleepPeriod = 1/dataRate
+        while self.sendingMagData:
+            
+            sampleCountInBytes = struct.pack('>I', count)[1:4]
+            timeStampInBytes : bytearray = struct.pack("<f", datetime.now().timestamp())
+
+            sensorXValue = float(self.smartDotData[count % self.smartDotData.__sizeof__()].strip().split(',')[4])
+            sensorYValue = float(self.smartDotData[count % self.smartDotData.__sizeof__()].strip().split(',')[5])
+            sensorZValue = float(self.smartDotData[count % self.smartDotData.__sizeof__()].strip().split(',')[6])
+
+            xValInBytes : bytearray = struct.pack('<f', sensorXValue) 
+            yValInBytes : bytearray = struct.pack('<f', sensorYValue)
+            zValInBytes : bytearray = struct.pack('<f', sensorZValue)
+        
+            
+            mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+
+            print("SmartDotEmulator: %lf, %lf, %lf" % (sensorXValue, sensorYValue, sensorZValue))
+            count+=1
+            try: ## Check if TCP connection is set up, if not, just print in terminal
+                self.magDataSig(mess)
+                print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex()) #Not with SME Prefix because ALL iSmartDot classes print this
+            except:
+                print("Mess Sent: " + mess.hex())
+            sleep(sleepPeriod)
+
+    def gyroHandler(self, dataRate):
         count = 1
         sleepPeriod = 1/dataRate
         while self.sendingGyroData:
@@ -63,33 +116,37 @@ class SmartDotEmulator(iSmartDot):
 
             print("SmartDotEmulator: %lf, %lf, %lf" % (sensorXValue, sensorYValue, sensorZValue))
             count+=1
-            if type == "Gyroscope":   
-                print(self.gyroDataSig) #delee
-                try: ## Check if TCP connection is set up, if not, just print in terminal
-                    print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
-                except:
-                    print("Mess Sent: " + mess.hex())
-
+            try: ## Check if TCP connection is set up, if not, just print in terminal
+                self.gyroDataSig(mess)
+                print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex()) #Not with SME Prefix because ALL iSmartDot classes print this
+            except:
+                print("Mess Sent: " + mess.hex())
             sleep(sleepPeriod)
 
     def startMag(self,  dataRate : int, odr : None):   
-        # Run the event loop
-        pass
+        self.sendingMagData = True
+        #Create Thread That Handles Accel Data, then kill itself once stopped
+        magThread = threading.Thread(target=self.magHandler, args=(dataRate,), daemon=True)        
+        magThread.start()
+        
     
     def stopMag(self):
-        pass
+        self.sendingMagData = False
 
     def startAccel(self, dataRate : int, range : int):
-        pass
+        self.sendingAccelData = True
+        #Create Thread That Handles Accel Data, then kill itself once stopped
+        accelThread = threading.Thread(target=self.accelHandler, args=(dataRate,), daemon=True)        
+        accelThread.start()
 
     def stopAccel(self):
-        pass
+        self.sendingAccelData = False
 
     def startGyro(self, dataRate : int, range : int):
         self.sendingGyroData = True
-        self.loop.create_task(self.my_handler(dataRate, "Gyroscope"))  # Schedule the handler           
-        
-
+        #Create Thread That Handles Accel Data, then kill itself once stopped
+        gyroThread = threading.Thread(target=self.gyroHandler, args=(dataRate,), daemon=True)        
+        gyroThread.start()
 
     def stopGyro(self):
         self.sendingGyroData = False

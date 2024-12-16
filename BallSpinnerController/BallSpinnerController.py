@@ -167,14 +167,13 @@ class BallSpinnerController():
                                 pass
                             
                             case(0x05): #SMARTDOT_SCAN Message
-                                print(data[3:9].hex())
                                 #If the 
                                 if data[3:9].hex() == "000000000000":
-                                    print("TRUEEEEE")
+                                    print("Received: SMARTDOT_SCAN_INIT") if self.debug else None
+
                                     self.mode = BSCModes.BLUETOOTH_SCANNING
                                     self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
-                                    print("Connecting to \"SmartDot\"")
-                                #Keep Trying to connect to Module in Presentation Ball
+
                                 else:
                                     self.scanner.cancel()
                                     self.smartDot : iSmartDot = None
@@ -194,17 +193,18 @@ class BallSpinnerController():
                                         print("Womp Womp") 
                                         self.smartDot = MetaMotion()
                                     print("Connecting to "+ smartDotMACStr)
-                                    print(smartDotMACStr)
-                                    if not self.smartDot.connect(smartDotMACStr):   
+                                    if self.smartDot.connect(smartDotMACStr):   
+                                        bytesData = bytearray([0x06, 0x00, 0x06])
+                                        bytesData.extend(data[3:9]) 
+                                        print("Sending: 0x%s" % bytes(bytesData).hex())
+                                        self.commsChannel.send(bytesData)
+                                        self.mode = BSCModes.READY_FOR_INSTRUCTIONS
+                                    else:
                                         self.smartDot = None
-                                    
-                                    #NEED TO CHECK IF NOT TRUE, SEND ERROR
-                                    bytesData = bytearray([0x06, 0x00, 0x06])
-                                    bytesData.extend(data[3:9]) 
-                                    print("Sending: 0x%s" % bytes(bytesData).hex())
-                                    self.commsChannel.send(bytesData)
-                                    self.mode = BSCModes.READY_FOR_INSTRUCTIONS
-    
+                                        #NEED TO CHECK IF NOT TRUE, SEND ERROR
+
+                                        
+
                             case(0x08): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 
@@ -241,6 +241,7 @@ class BallSpinnerController():
                                     self.smartDot.stopAccel()
                                     self.smartDot.stopGyro()
                                     self.smartDot.stopMag()
+                                    
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
                     sys.exit(1)
@@ -265,7 +266,6 @@ class BallSpinnerController():
                     self.availDevicesType[result.mac] = smartDotClass
 
         if(debugMode):
-            print("Software Added")
             self.availDevices["11:11:11:11:11:11"] = "smartDotSimulator" 
             self.availDevicesType["11:11:11:11:11:11"] = SmartDotEmulator
 

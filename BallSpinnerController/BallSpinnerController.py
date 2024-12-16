@@ -85,6 +85,9 @@ class BallSpinnerController():
         self.smartDot.stopGyro()
         self.smartDot.stopAccel()
         self.smartDot.stopMag()
+        del self.PrimMotor
+        del self.secMotor1
+        del self.secMotor2
         self.commsChannel.close()
         self.commsPort.close()
     

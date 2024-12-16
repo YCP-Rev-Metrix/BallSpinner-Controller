@@ -109,9 +109,13 @@ class ProtocolTests(unittest.TestCase): #Test the Protocol Messages Through TCP 
         AccelCount = 0
         GyroCount = 0
         MagCount = 0
+        LightCount = 0
 
         print("Test: Receiving at least 10 of Each 9DOF, Then Stopping")
-        while not (AccelCount >= 10) or not (GyroCount >= 10) or not (MagCount >= 10):
+        while (not (AccelCount >= 10) 
+               or not (GyroCount >= 10) 
+               or not (MagCount >= 10)
+               or not (LightCount  >= 10)) :
             data = self.commsPort.recv(23)
             if not data == b'':
                 print("DATA SIZE %s" %data[0]) #delete
@@ -135,6 +139,8 @@ class ProtocolTests(unittest.TestCase): #Test the Protocol Messages Through TCP 
                         pass
                     
                     case 'L':
+                        LightCount += 1
+                        print("Test: Light Receive %i" % LightCount)
                         pass 
 
                     case _:
@@ -160,34 +166,6 @@ class ProtocolTests(unittest.TestCase): #Test the Protocol Messages Through TCP 
             self._test_ABBREVIATED_SMARTDOT_CONNECTED()
             self._test_SD_SENSOR_DATA()
             self._testAbruptCrashing()
-
-        '''
-        #Receive Confirmation
-        print(self.commsPort.recv(1024))
-
-        
-        self.commsPort.sendall(bytearray([0x08, 0x00, 0x03, 0x0A, 0x0A, 0x0A]))
-
-        print(self.commsPort.recv(1024))
-
-        #receive 10 data then stop
-        print("Test: Receiving 10, Then Stopping")
-        count = 0
-        while count <= 10:
-            data = self.commsPort.recv(1024)
-            if not data == b'':
-                print("TEST RECEIVED:")
-                print(data)
-                count += 1
-                pass
-        
-        print("Test: All Data Received, Stopping Server")
-        self.commsPort.close()
-
-        self.commsPort.sendall(bytearray([0x0B]))
-        self.commsPort.recv(1024)
-        '''
-
         
     @classmethod
     def tearDown(cls):

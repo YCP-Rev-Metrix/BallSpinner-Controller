@@ -118,18 +118,30 @@ class BallSpinnerController():
                 self.resetCommsPort()
                 raise BrokenPipeError
 
-        self.smartDot.setDataSignals(accelDataSig= accelDataSignal, magDataSig= magDataSignal, gyroDataSig=gyroDataSignal)
+        def lightDataSignal(dataBytes : bytearray):
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x4C])
+            bytesData.extend(dataBytes)
+            #Add 0's to "Y and Z values"
+            bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+            try:
+                self.commsChannel.sendall(bytesData)
+            except Exception as e:
+                self.resetCommsPort()
+                raise BrokenPipeError
+            
+        self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
         #Instantly Setting the Start Configs for the 9DOF's to skip implementation
 
         self.smartDot.startMag(10, 10)
         self.smartDot.startAccel(100, 10)
-        self.smartDot.startGyro(100, 10)       
+        self.smartDot.startGyro(100, 10) 
+        self.smartDot.startLight(100, 10)      
         
         await self.wait_for_completion()
         print("Handler Done")
 
     async def wait_for_completion(self):
-        await asyncio.sleep(9999)  # Or replace this with a condition/event loop
+        await asyncio.sleep(9999)  
 
     async def commsHandler(self):
             loop = asyncio.get_event_loop()

@@ -77,7 +77,6 @@ class MetaMotion(iSmartDot):
         except:    
             print(parsedData)
 
-
     def magDataHandler(self, ctx, data):
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp() - self.startMagTime
@@ -191,7 +190,6 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_gyro_bmi160_start(self.device.board)
         self.GyroSampleCount = 0
 
-
     def stopGyro(self):
         print("Stopping Gyroscope Sampling")
         libmetawear.mbl_mw_gyro_bmi160_stop(self.device.board)
@@ -219,6 +217,8 @@ class MetaMotion(iSmartDot):
     def turnOffLED(self):
         libmetawear.mbl_mw_led_stop_and_clear(self.device.board)
 
-    def getActiveSignals(self):
-        self.active_signals = libmetawear.mbl_mw_datasignal_get_active_datasignals(self.device.board)
-        print(self.active_signals)
+    def startLight(self):
+        pass
+
+    def stopLight(self):
+        pass

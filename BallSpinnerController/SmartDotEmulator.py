@@ -129,7 +129,29 @@ class SmartDotEmulator(iSmartDot):
         magThread = threading.Thread(target=self.magHandler, args=(dataRate,), daemon=True)        
         magThread.start()
         
-    
+    def lightHandler(self, dataRate):
+        count = 1
+        sleepPeriod = 1/dataRate
+        while self.sendingLightData:
+            
+            sampleCountInBytes = struct.pack('>I', count)[1:4]
+            timeStampInBytes : bytearray = struct.pack("<f", datetime.now().timestamp())
+
+            sensorValue = float(self.smartDotData[count % self.smartDotData.__sizeof__()].strip().split(',')[10])
+            
+            ValInBytes : bytearray = struct.pack('<f', sensorValue) 
+            
+            mess = sampleCountInBytes + timeStampInBytes + ValInBytes 
+            
+            print("SmartDotEmulator: %lf" % sensorValue)
+            count+=1
+            try: ## Check if TCP connection is set up, if not, just print in terminal
+                self.lightDataSig(mess)
+                print("Encoded Data " + ValInBytes.hex()) #Not with SME Prefix because ALL iSmartDot classes print this
+            except:
+                print("Mess Sent: " + mess.hex())
+            sleep(sleepPeriod)
+
     def stopMag(self):
         self.sendingMagData = False
 
@@ -150,5 +172,13 @@ class SmartDotEmulator(iSmartDot):
 
     def stopGyro(self):
         self.sendingGyroData = False
-    
+
+    def startLight(self,  dataRate : int, odr : None):   
+        self.sendingLightData = True
+        #Create Thread That Handles Accel Data, then kill itself once stopped
+        lightThread = threading.Thread(target=self.lightHandler, args=(dataRate,), daemon=True)        
+        lightThread.start()
+
+    def stopLight(self):
+        self.sendingLightData = False
         

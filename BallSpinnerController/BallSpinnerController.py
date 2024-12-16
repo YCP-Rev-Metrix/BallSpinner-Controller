@@ -34,7 +34,7 @@ class BSCModes(Enum):
     
 class BallSpinnerController():
 
-    def __init__(self, debug):
+    def __init__(self, debug="0", name="Ball Spinner Controller"):
         #Before Anything, Check if user has raised permissions
         try:
             #Manually Raise Permissiosn, if Possible
@@ -98,12 +98,6 @@ class BallSpinnerController():
             except Exception as e:
                 raise self.resetCommsPort()
 
-                def brokenPipeErrorThrower():
-                    print(f"Exception caught in the event loop: {exception}")
-                # Schedule the exception-handling coroutine on the main event loop
-                asyncio.run_coroutine_threadsafe(brokenPipeErrorThrower, asyncio.get_event_loop())
-                raise BrokenPipeError
-
         def magDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x0A, 0x00, 0x13, 0x4D])
             bytesData.extend(dataBytes)
@@ -111,11 +105,6 @@ class BallSpinnerController():
                 self.commsChannel.sendall(bytesData)
             except BrokenPipeError:
                 raise 
-                
-                def brokenPipeErrorThrower():
-                    print(f"Exception caught in the event loop: {exception}")
-                # Schedule the exception-handling coroutine on the main event loop
-                asyncio.run_coroutine_threadsafe(brokenPipeErrorThrower, asyncio.get_event_loop())
         
         def gyroDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x0A, 0x00, 0x13, 0x47])
@@ -124,13 +113,6 @@ class BallSpinnerController():
                 self.commsChannel.sendall(bytesData)
             except Exception as e:
                 self.resetCommsPort()
-                raise BrokenPipeError
-                
-
-                def brokenPipeErrorThrower():
-                    print(f"Exception caught in the event loop: {exception}")
-                # Schedule the exception-handling coroutine on the main event loop
-                asyncio.run_coroutine_threadsafe(brokenPipeErrorThrower, asyncio.get_event_loop())
                 raise BrokenPipeError
 
         self.smartDot.setDataSignals(accelDataSig= accelDataSignal, magDataSig= magDataSignal, gyroDataSig=gyroDataSignal)
@@ -154,11 +136,11 @@ class BallSpinnerController():
                     data = await loop.run_in_executor(None, self.commsChannel.recv, 1024)
                     #parse message
                     if not data == b'':
-                        print(data.hex() if not self.debug else "")
+                        print("Received: %s" % data.hex())  if not self.debug else None
                         match data[0]: 
                             case(0x01): #APP_INIT Message
-                                #Message Received: | Mess Type: 0x01 | Mess Size: 0x0001 | RandomByte: XXXX 
-                                print("Message Type: App Sending Start Message") if self.debug else None
+                                #Message Received: | Msg Type: 0x01 | Msg Size: 0x0001 | RandomByte: XXXX 
+                                print("Received: APP_INIT Message") if self.debug else None
                                 if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
                                     #Send Error: Already Connected to Application
 
@@ -166,12 +148,11 @@ class BallSpinnerController():
                                     pass
                                 else:
                                     # Confirm Communications are established and send confirmation signal
-                                    #| Mess Type: 0x02 | Mess Size: 0x0001 | RandomByte: XXXX 
+                                    #| Msg Type: 0x02 | Msg Size: 0x0001 | RandomByte: XXXX 
                                     
+                                    print("Sending: APP_INIT_ACK Message") if self.debug else None
                                     #Grab Random Byte from third and resend
                                     bytesData = bytearray([0x02, 0x00, 0x01, data[3]]) 
-                                    #bytesData.append(data[2])
-                                    #print(bytes(bytesData))
                                     self.commsChannel.send(bytesData)
                                     self.mode = BSCModes.IDLE
 
@@ -219,8 +200,8 @@ class BallSpinnerController():
                                     
                                     #NEED TO CHECK IF NOT TRUE, SEND ERROR
                                     bytesData = bytearray([0x06, 0x00, 0x06])
-                                    bytesData.extend(data[4:9]) 
-                                    print(bytes(bytesData))
+                                    bytesData.extend(data[3:9]) 
+                                    print("Sending: 0x%s" % bytes(bytesData).hex())
                                     self.commsChannel.send(bytesData)
                                     self.mode = BSCModes.READY_FOR_INSTRUCTIONS
     

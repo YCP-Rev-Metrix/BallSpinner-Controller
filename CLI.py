@@ -10,8 +10,13 @@ import asyncio
 class CLI:
     async def scanAll(self) -> dict:
     
-        availDevices = {}
-        smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
+        self.availDevices = {}
+        self.availDevicesType = {}
+
+        self.smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
+
+        self.availDevices["11:11:11:11:11:11"] = "smartDotSimulator" 
+        self.availDevicesType["11:11:11:11:11:11"] = SmartDotEmulator
 
         #self.mode = "Scanning"
         selection = -1
@@ -20,9 +25,9 @@ class CLI:
 
         #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
         def handler(result):
-            for listedConnect in range(len(smartDot)):
-                if result.has_service_uuid(smartDot[listedConnect].UUID()):
-                    availDevices[result.mac] = result.name
+            for listedConnect in range(len(self.smartDot)):
+                if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
+                    self.availDevices[result.mac] = result.name
 
         BleScanner.set_handler(handler)
         BleScanner.start()
@@ -35,7 +40,7 @@ class CLI:
 
                 #print all BLE devices found and append to connectable list                
                 count = 0
-                for address, name in six.iteritems(availDevices):
+                for address, name in six.iteritems(self.availDevices):
                     if count >= i :
                         print("[%d] %s (%s)" % (i, address, name))
                         i += 1
@@ -43,7 +48,7 @@ class CLI:
 
         except : #Called when KeyInterrut ^C is called
             BleScanner.stop()
-            return availDevices
+            return self.availDevices
 
     def smartDotCLI(self):
         print("Starting Connection to SmartDot Module")
@@ -51,8 +56,12 @@ class CLI:
         availDevices = asyncio.run(self.scanAll())
         print("Select SmartDot to Connect to:")
         consInput = input()
-        smartDot = MetaMotion()
-        smartDotConnect = smartDot.connect(tuple(availDevices.keys())[int(consInput)])
+
+        #Jank way to grab Correct MAC Address: Creates Keys and gra
+        smartDotMAC = tuple(self.availDevicesType.keys())[int(consInput)]
+        smartDot = self.availDevicesType[smartDotMAC]()
+        print()
+        smartDotConnect = smartDot.connect(smartDotMAC)
         # Connect to Selected SmartDot Module
         while not smartDotConnect:
             print("Unable to Connect to ")
@@ -73,10 +82,6 @@ class CLI:
             print("[6] Start Gyro Sensing")
             print("[7] Start Mag Sensing")
             print("[8] Start All Sensing")
-
-            if smartDot.commsChannel == None:
-                print("[9] Connect to PC")
-
 
             print("[E] Exit")
             consInput = input()

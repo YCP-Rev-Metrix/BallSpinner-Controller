@@ -26,7 +26,8 @@ class CLI:
         #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
         def handler(result):
             for listedConnect in range(len(self.smartDot)):
-                if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
+                #if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
+                    print("Device Found")
                     self.availDevices[result.mac] = result.name
 
         BleScanner.set_handler(handler)

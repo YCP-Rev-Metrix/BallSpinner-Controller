@@ -58,7 +58,6 @@ class MetaMotion(iSmartDot):
     
     def accelDataHandler(self, ctx, data): 
         self.AccelSampleCount += 1   
-
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp() - self.startAccelTime
         
@@ -81,6 +80,7 @@ class MetaMotion(iSmartDot):
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp() - self.startMagTime
         sampleCountInBytes = struct.pack('>I',self.MagSampleCount )[1:4]
+        self.MagSampleCount+=1
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
         yValInBytes : bytearray = struct.pack('<f', parsedData.y)
@@ -173,7 +173,7 @@ class MetaMotion(iSmartDot):
     
     def startGyro(self, dataRate : int, range : int):
         # Set ODR to 100Hz
-        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, GyroBoschOdr._100Hz)
+        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, 100)
 
         # Set data range to +/250 degrees per second
         libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, range)

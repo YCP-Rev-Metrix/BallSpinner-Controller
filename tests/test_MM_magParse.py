@@ -2,7 +2,7 @@ from BallSpinnerController import *
 import unittest
 import struct
 import asyncio
-from mbientlab.metawear import MetaWear, libmetawear, parse_value,  formatTime
+from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
 from mbientlab.warble import * 
 from datetime import datetime
@@ -34,10 +34,8 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
             try:
                 self.currTime  = float(struct.unpack('<f', mess[3:7])[0]) 
                 print(1/(self.currTime - self.prevTime))
-                print(data.contents.epoch)
                 self.prevTime = self.currTime
                 pasedData = parse_value(data)
-                print(pasedData.timestamp)
                 #Can't find any other way to call code from BSC so its copied pasted below:
                 bytesData = bytearray([0x0A, 0x00, 0x13, 0x54])
                 bytesData.extend(mess)

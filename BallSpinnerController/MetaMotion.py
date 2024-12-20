@@ -152,16 +152,25 @@ class MetaMotion(iSmartDot):
 
     def startMag(self,  dataRate : int, odr : None):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
-        if dataRate == 10:
-            libmetawear.mbl_mw_mag_bmm150_set_preset(self.device.board, MagBmm150Preset.LOW_POWER)
-        elif dataRate == 20:
-            libmetawear.mbl_mw_mag_bmm150_set_preset(self.device.board, MagBmm150Preset.HIGH_ACCURACY)
-
+        #List of Valid Data as depicted from Metawear API
+        magDataRates = {
+                            MagBmm150Odr._2Hz  :  2, 
+                            MagBmm150Odr._6Hz  :  6,
+                            MagBmm150Odr._8Hz  :  8,
+                            MagBmm150Odr._10Hz : 10,
+                            MagBmm150Odr._15Hz : 15,
+                            MagBmm150Odr._20Hz : 20,
+                            MagBmm150Odr._25Hz : 25,
+                            MagBmm150Odr._30Hz : 30}
+        
+        #determine actual datarate based from finding value closest to parameter datarate
+        dataRate = min(magDataRates, key=lambda k: abs(magDataRates[k] - dataRate))
+        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, dataRate)
+       
         self.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.magCallback)
 
         libmetawear.mbl_mw_mag_bmm150_enable_b_field_sampling(self.device.board)
-        self.startMagTime = datetime.now().timestamp()
         libmetawear.mbl_mw_mag_bmm150_start(self.device.board)
         self.MagSampleCount = 0
 
@@ -190,7 +199,6 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_acc_enable_acceleration_sampling(self.device.board)
         
         if(self.accelSignal != None):
-            self.startAccelTime = datetime.now().timestamp()
             libmetawear.mbl_mw_acc_start(self.device.board)
         else:
             print("Unable to Start Polling Data: Acceleration Not Enabled")
@@ -217,7 +225,6 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_datasignal_subscribe(self.gyroSig, None, self.gyroCallback)
         libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.device.board)
         
-        self.startGyroTime = datetime.now().timestamp()
         libmetawear.mbl_mw_gyro_bmi160_start(self.device.board)
         self.GyroSampleCount = 0
 

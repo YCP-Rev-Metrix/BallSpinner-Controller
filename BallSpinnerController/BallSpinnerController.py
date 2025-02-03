@@ -218,8 +218,6 @@ class BallSpinnerController():
                                         self.smartDot = None
                                         #NEED TO CHECK IF NOT TRUE, SEND ERROR
 
-                                        
-
                             case(0x08): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 
@@ -245,7 +243,7 @@ class BallSpinnerController():
                                 self.secMotor2.changeSpeed(int(data[5]/12*100))
 
                             case(0x0B): #STOP_MOTOR_INSTRUCTIONS
-                                if self.mode == BSCModes.TAKING_SHOT_DATA:
+                                if self.mode == BSCModes.IDLE:
                                     #Stop Motors
 
                                     self.PrimMotor.turnOffMotor()

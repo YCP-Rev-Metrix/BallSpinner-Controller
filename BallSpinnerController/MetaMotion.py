@@ -27,12 +27,11 @@ class MetaMotion(iSmartDot):
         self.accelDataSig =  accelDataSig
         self.gyroDataSig = gyroDataSig
         self.magDataSig = magDataSig
-        print(self.accelDataSig)
-        print(self.gyroDataSig)
-        print(self.magDataSig)
+
+        #Need To Check if We need
         sleep(3)  
     
-    def setCommsPort(self, connection):
+    def setCommsPort(self, connection): #Check if we need
         self.commsChannel = connection
 
     def connect(self, MAC_Address) -> bool:
@@ -47,6 +46,7 @@ class MetaMotion(iSmartDot):
             self.accelCallback = FnVoid_VoidP_DataP(self.accelDataHandler)
             self.magCallback = FnVoid_VoidP_DataP(self.magDataHandler)
             self.gyroCallback = FnVoid_VoidP_DataP(self.gyroDataHandler)
+            self.lightCallback = FnVoid_VoidP_DataP(self.lightDataHandler)
 
             print("Connected to device")
             return True
@@ -117,7 +117,21 @@ class MetaMotion(iSmartDot):
         except:
             print(parsedData)
             
+    def lightDataHandler(self, ctx, data):
+        parsedData = parse_value(data)
+        timeStamp = datetime.now().timestamp() - self.startLightTime
+        sampleCountInBytes = struct.pack('>I',self.LightSampleCount )[1:4]
+        self.LightSampleCount+=1
 
+        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+        valInBytes : bytearray = struct.pack('<f', parsedData) 
+
+        mess = sampleCountInBytes + timeStampInBytes + valInBytes + b'0000000000000000' 
+        try:
+            self.lightDataSigSig(mess)
+            print("Encoded Data " + mess)
+        except:
+            print(parsedData)
 
     def startMag(self,  dataRate : int, odr : None):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
@@ -196,6 +210,22 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_gyro_bmi160_disable_rotation_sampling(self.device.board)
         libmetawear.mbl_mw_datasignal_unsubscribe(self.gyroSig)
         
+    def startLight(self):
+        libmetawear.mbl_mw_als_ltr329_set_gain(self.device.board, AlsLtr329Gain._96X)
+        libmetawear.mbl_mw_als_ltr329_set_integration_time(self.device.board, AlsLtr329IntegrationTime._400ms)
+        libmetawear.mbl_mw_als_ltr329_set_measurement_rate(self.device.board, AlsLtr329MeasurementRate._1000ms)
+        libmetawear.mbl_mw_als_ltr329_write_config(self.device.board)
+
+        self.lightSig = libmetawear.mbl_mw_als_ltr329_get_illuminance_data_signal(self.device.board)
+        libmetawear.mbl_mw_datasignal_subscribe(self.lightSig, None, self.lightCallback)
+        
+        self.startLightTime = datetime.now().timestamp()
+        libmetawear.mbl_mw_als_ltr329_start(self.device.board)
+        self.LightSampleCount = 0
+
+    def stopLight(self):
+        pass
+
     def turnOnRedLED(self):
         pattern = LedPattern(delay_time_ms= 5000, repeat_count= Const.LED_REPEAT_INDEFINITELY)
         libmetawear.mbl_mw_led_load_preset_pattern(byref(pattern), LedPreset.SOLID)
@@ -217,8 +247,4 @@ class MetaMotion(iSmartDot):
     def turnOffLED(self):
         libmetawear.mbl_mw_led_stop_and_clear(self.device.board)
 
-    def startLight(self):
-        pass
 
-    def stopLight(self):
-        pass

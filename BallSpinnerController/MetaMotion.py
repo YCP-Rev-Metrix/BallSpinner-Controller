@@ -23,10 +23,11 @@ class MetaMotion(iSmartDot):
         if autoConnect:
             self.connect(MAC_Address)
         
-    def setDataSignals(self, accelDataSig, gyroDataSig, magDataSig):
+    def setDataSignals(self, accelDataSig, gyroDataSig, magDataSig, lightDataSig):
         self.accelDataSig =  accelDataSig
         self.gyroDataSig = gyroDataSig
         self.magDataSig = magDataSig
+        self.lightDataSig = lightDataSig
 
         #Need To Check if We need
         sleep(3)  
@@ -128,7 +129,7 @@ class MetaMotion(iSmartDot):
 
         mess = sampleCountInBytes + timeStampInBytes + valInBytes + b'0000000000000000' 
         try:
-            self.lightDataSigSig(mess)
+            self.lightDataSig(mess)
             print("Encoded Data " + mess)
         except:
             print(parsedData)

@@ -10,7 +10,6 @@ class Motor():
         #Configure GPIO Pin
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(GPIOPin, GPIO.OUT)
 
         #1kHz
         self.PWM = GPIO.PWM(GPIOPin, 500)
@@ -28,6 +27,7 @@ class Motor():
     def turnOffMotor(self):
         if self.state:
             self.PWM.stop()
+            GPIO.cleanup(self.GPIOPin)
             self.state = False
         else:
             print("Unable to Stop Motor: Motor is Not Running")

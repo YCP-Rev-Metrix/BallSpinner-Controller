@@ -107,7 +107,7 @@ class BallSpinnerController():
             try:
                 self.commsChannel.sendall(bytesData)
             except BrokenPipeError:
-                raise 
+                raise self.resetCommsPort()
         
         def gyroDataSignal(dataBytes : bytearray):
             bytesData = bytearray([0x0A, 0x00, 0x13, 0x47])
@@ -123,6 +123,8 @@ class BallSpinnerController():
             bytesData.extend(dataBytes)
             #Add 0's to "Y and Z values"
             bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+            print("Sending Light")
+            print(int(struct.unpack('>I', b'\x00' + bytesData[4:7])[0]))
             try:
                 self.commsChannel.sendall(bytesData)
             except Exception as e:
@@ -136,12 +138,19 @@ class BallSpinnerController():
         self.smartDot.startAccel(100, 10)
         self.smartDot.startGyro(100, 10) 
         self.smartDot.startLight(100, 10)      
-        
-        await self.wait_for_completion()
+        print("All started")
+        try:
+            await self.wait_for_completion()
+        except Exception as e:
+            print(e)
         print("Handler Done")
 
     async def wait_for_completion(self):
-        await asyncio.sleep(9999)  
+        print("Keeping SmartdotHandler up")
+        try:
+            await asyncio.sleep(9999)  
+        except Exception as e:
+            print(e)
 
     async def commsHandler(self):
             loop = asyncio.get_event_loop()
@@ -224,11 +233,15 @@ class BallSpinnerController():
                                     print("Initializing Sensors")
                                     # First Motor Instruction:         
                                     try:          
-                                        asyncio.create_task(self.smartDotHandler())    
+                                        self.smartDotHandlerThread = asyncio.create_task(self.smartDotHandler())    
                                     except BrokenPipeError:
                                         raise BrokenPipeError
+                                    except Exception as e:
+                                        print("Unable to start thread")
+                                        print(e)
                                     #Turn On Motors
-                                    self.PrimMotor = Motor(40)
+                                    print("Turning on motors")
+                                    self.PrimMotor = Motor(22)
                                     self.secMotor1 = Motor(38)
                                     self.secMotor2 = Motor(35)                
 
@@ -243,22 +256,28 @@ class BallSpinnerController():
                                 self.secMotor2.changeSpeed(int(data[5]/12*100))
 
                             case(0x0B): #STOP_MOTOR_INSTRUCTIONS
-                                if self.mode == BSCModes.IDLE:
+                                
+                                    print("Received Stop Function")
                                     #Stop Motors
 
                                     self.PrimMotor.turnOffMotor()
                                     self.secMotor1.turnOffMotor()
                                     self.secMotor2.turnOffMotor()
-
+                                    
+                                    del self.PrimMotor
+                                    del self.secMotor1
+                                    del self.secMotor2
+   
                                     #Stop SmartDot Data Collection
                                     self.smartDot.stopAccel()
                                     self.smartDot.stopGyro()
                                     self.smartDot.stopMag()
+                                    self.mode = BSCModes.READY_FOR_INSTRUCTIONS
+                                    self.smartDotHandlerThread.cancel()
                                     
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
                     sys.exit(1)
-                    raise
             
 
 
@@ -310,7 +329,7 @@ class BallSpinnerController():
                                         int(address[10:12],16)]))
                                         
                     bytesData.extend(name.encode("utf-8"))
-                    print(self.commsChannel.send(bytesData))
+                    self.commsChannel.send(bytesData)
                     
                 
 

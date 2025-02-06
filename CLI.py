@@ -6,6 +6,7 @@ from mbientlab.warble import BleScanner
 import six
 import time
 import asyncio
+import socket
 
 class CLI:
     async def scanAll(self) -> dict:
@@ -194,6 +195,42 @@ class CLI:
                 consInput = input()
                 motors[int(motorNum)].changeSpeed(int(consInput))
 
+    def tcpCLI(self):
+        consInput = ''
+        ipAddr = ''
+        print("Starting Up Connection to Application, press ^C to stop")
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                ipAddr = s.getsockname()[0]
+            commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_address = (ipAddr, 8411)  # Replace 'localhost' with the server's IP if needed
+            print('Server listening on {}:{}'.format(*server_address))
+            commsPort.bind(server_address)
+
+            #wait for a device to attempt TCP connection to Port
+            commsPort.listen(1)
+            commsChannel, clientIp  = commsPort.accept()
+            commsChannel.setblocking(True)
+        except KeyboardInterrupt:
+            print("\nProcess Ended By User")
+        except Exception as e:
+            print(e)
+            print("Unable to connect to the internet to obtain a Global Ip address, please try again later")
+            consInput = 'E'
+            pass 
+        print("Connection Established, verifying application")
+        #Grab Random Byte from third and resend
+        data = commsChannel.recv(1024)
+        bytesData = bytearray([0x02, 0x00, 0x01, data[3]]) 
+        commsChannel.send(bytesData)
+        print("Software Connected")
+        while(consInput != 'E'):
+            print("What Message do you want to send?")
+            print("0x",end="")
+            message = input()
+            commsChannel.send(message)
+
     def __init__(self):
         consInput = ""
         print("Ball Spinner Controller UI:")
@@ -202,7 +239,7 @@ class CLI:
             print("----------------------")
             print("[1] SmartDot Module")
             print("[2] Motor")
-
+            print("[3] TCP")
             print("[E] Exit")
             consInput = input()
 
@@ -210,6 +247,8 @@ class CLI:
                 self.smartDotCLI()
             elif consInput == '2':
                 self.motorCLI()
+            elif consInput == '3':
+                self.tcpCLI()
             elif consInput == 'E':
                 pass
             else:

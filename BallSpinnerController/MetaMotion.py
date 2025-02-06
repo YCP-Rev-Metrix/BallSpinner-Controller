@@ -22,15 +22,6 @@ class MetaMotion(iSmartDot):
         self.commsChannel = commChannel
         if autoConnect:
             self.connect(MAC_Address)
-        
-    def setDataSignals(self, accelDataSig, gyroDataSig, magDataSig, lightDataSig):
-        self.accelDataSig =  accelDataSig
-        self.gyroDataSig = gyroDataSig
-        self.magDataSig = magDataSig
-        self.lightDataSig = lightDataSig
-
-        #Need To Check if We need
-        sleep(3)  
     
     def setCommsPort(self, connection): #Check if we need
         self.commsChannel = connection
@@ -72,7 +63,7 @@ class MetaMotion(iSmartDot):
 
         try: ## Check if TCP connection is set up, if not, just print in terminal
             self.accelDataSig(mess)
-            print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
         except:    
             print(parsedData)
@@ -80,7 +71,7 @@ class MetaMotion(iSmartDot):
     def magDataHandler(self, ctx, data):
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp() - self.startMagTime
-        sampleCountInBytes = struct.pack('>I',self.MagSampleCount )[1:4]
+        sampleCountInBytes = struct.pack('>I',self.MagSampleCount)[1:4]
         self.MagSampleCount+=1
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
@@ -90,7 +81,7 @@ class MetaMotion(iSmartDot):
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
         try:
             self.magDataSig(mess)
-            print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
         except Exception as e:
             print(f"Unexpected error in accelDataHandler: {e}")
 
@@ -108,7 +99,7 @@ class MetaMotion(iSmartDot):
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
         try: ## Check if TCP connection is set up, if not, just print in terminal
             self.gyroDataSig(mess)
-            #print("Encoded Data " + xValInBytes + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
         except BrokenPipeError:
             raise
@@ -127,12 +118,13 @@ class MetaMotion(iSmartDot):
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         valInBytes : bytearray = struct.pack('<f', parsedData) 
 
-        mess = sampleCountInBytes + timeStampInBytes + valInBytes + b'0000000000000000' 
+        mess = sampleCountInBytes + timeStampInBytes + valInBytes 
         try:
             self.lightDataSig(mess)
-            print("Encoded Data " + mess)
-        except:
+            print("Encoded Data " + valInBytes.hex()+ " 0000 0000")
+        except Exception as e:
             print(parsedData)
+            print(e)
 
     def startMag(self,  dataRate : int, odr : None):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
@@ -211,7 +203,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_gyro_bmi160_disable_rotation_sampling(self.device.board)
         libmetawear.mbl_mw_datasignal_unsubscribe(self.gyroSig)
         
-    def startLight(self):
+    def startLight(self,  dataRate : int, odr : None):
         libmetawear.mbl_mw_als_ltr329_set_gain(self.device.board, AlsLtr329Gain._96X)
         libmetawear.mbl_mw_als_ltr329_set_integration_time(self.device.board, AlsLtr329IntegrationTime._400ms)
         libmetawear.mbl_mw_als_ltr329_set_measurement_rate(self.device.board, AlsLtr329MeasurementRate._1000ms)

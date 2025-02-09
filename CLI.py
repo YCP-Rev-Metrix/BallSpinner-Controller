@@ -195,7 +195,8 @@ class CLI:
                 consInput = input()
                 motors[int(motorNum)].changeSpeed(int(consInput))
 
-    def tcpCLI(self):
+    async def tcpCLI(self):
+        #Start Up TCP Socket
         consInput = ''
         ipAddr = ''
         print("Starting Up Connection to Application, press ^C to stop")
@@ -204,7 +205,7 @@ class CLI:
                 s.connect(("8.8.8.8", 80))
                 ipAddr = s.getsockname()[0]
             commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_address = (ipAddr, 8411)  # Replace 'localhost' with the server's IP if needed
+            server_address = (ipAddr, 8411)  
             print('Server listening on {}:{}'.format(*server_address))
             commsPort.bind(server_address)
 
@@ -213,30 +214,86 @@ class CLI:
             commsChannel, clientIp  = commsPort.accept()
             commsChannel.setblocking(True)
         except KeyboardInterrupt:
-            print("\nProcess Ended By User")
+            print("\nUser Stopped While Listening, Exiting")
+            commsPort.close()
+            raise KeyboardInterrupt
+        except OSError as e:
+            if e.errno == 98:
+                print("Port was not de-allocated properly, Exiting")
+                raise KeyboardInterrupt
         except Exception as e:
             print(e)
             print("Unable to connect to the internet to obtain a Global Ip address, please try again later")
             consInput = 'E'
-            pass 
         print("Connection Established, verifying application")
+        
         #Grab Random Byte from third and resend
         data = commsChannel.recv(1024)
         bytesData = bytearray([0x02, 0x00, 0x01, data[3]]) 
         commsChannel.send(bytesData)
         print("Software Connected")
-        while(consInput != 'E'):
-            print("What Message do you want to send?")
-            print("0x",end="")
-            message = input()
-            commsChannel.send(message)
+        async def tcpListener(): #Continuosly Print received messages, even when sending
+            print("Listening To Socket")
+            run = True
+            while run == True:
+                try:
+                    data = await asyncio.get_event_loop().run_in_executor(None, commsChannel.recv, 1024)
+                    print(f"Received {data}")
+                except Exception: #If commsChannel is closed, end loop
+                    run = False
+
+        #Start up tcpListener()        
+        listening = asyncio.create_task(tcpListener())
+
+        async def sendMessages(): #
+            message = ""
+            while(message != 'E'):
+                #Call input() without blocking main thread
+                message = await asyncio.get_event_loop().run_in_executor(None, input, "What Hex Message do you want to send?"+
+                "\nStart with 0x:\n"
+                "or press E to exit\n")
+                if(message == "E"):
+                    pass
+                elif message.__len__() % 2 !=0 :
+                    print("Unable to Parse Bytes with uneven amount of Hex")
+                else:
+                    bytesMessage : bytearray = []
+                    message=message[2:]
+                    size= 0
+                    
+                    while(size + 1 < message.__len__()):
+                        byte = int(message[size:size+2].encode("utf-8"))
+                        bytesMessage.append(byte)
+                        size = size+2
+                    bytesMessage = bytearray(bytesMessage)
+                    commsChannel.send(bytesMessage)
+                    #Give a chance for any immediate messages to come in
+                
+                time.sleep(.5)
+
+        #Allow time for tcpListener to start up before starting sendMessages()
+        #this way the tcpListener printout comes before the sendMessages printout
+        time.sleep(.1)
+        await sendMessages()
+        listening.cancel()
+        try:
+            await listening
+        except asyncio.CancelledError:
+            print("Extra Thread Closed")
+
+        commsChannel.shutdown(socket.SHUT_RDWR)
+        commsPort.shutdown(socket.SHUT_RDWR)
+        commsChannel.close()
+        commsPort.close()
+        print("Ports Closed")
+        time.sleep(1)
 
     def __init__(self):
         consInput = ""
         print("Ball Spinner Controller UI:")
-        print("Which Part Are You Interacting With?")
         while(consInput != 'E'):
             print("----------------------")
+            print("Which Part Are You Interacting With?")
             print("[1] SmartDot Module")
             print("[2] Motor")
             print("[3] TCP")
@@ -248,10 +305,14 @@ class CLI:
             elif consInput == '2':
                 self.motorCLI()
             elif consInput == '3':
-                self.tcpCLI()
+                try:
+                    asyncio.run(self.tcpCLI())
+                except KeyboardInterrupt: #If stopped by user, keep CLI running
+                    pass
             elif consInput == 'E':
                 pass
             else:
                 print("Invalid Input, Please Try Again\n")
 
 CLI()
+

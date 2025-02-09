@@ -27,7 +27,8 @@ class SmartDotEmulator(iSmartDot):
         try:
             csvFile = open('data/SmartDotEmulatorData.csv', 'r') 
             self.smartDotData = csvFile.readlines()
-        except:
+        except Exception as e:
+            print(e)
             return False
         
         finally: 

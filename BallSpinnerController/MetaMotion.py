@@ -14,6 +14,18 @@ from .iSmartDot import iSmartDot
 
 class MetaMotion(iSmartDot):
 
+    XL_availSampleRate = [12.5, 25, 50, 100, 200, 400, 800, 1600]
+    XL_availRange = [2,4,8,16]
+
+    GY_availSampleRate = [25, 50, 100, 200, 400, 800,1600,3200,6400]
+    GY_availRange = [125,250,500,1000,2000]
+
+    
+    MG_availSampleRate = []
+    MG_availRange = []
+
+    LT_availSampleRate = []
+    LT_availRange = []
     
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75a"
@@ -35,11 +47,28 @@ class MetaMotion(iSmartDot):
             #set connection parameters 7.5ms connection interval, 0 Slave interval, 6s timeout
             libmetawear.mbl_mw_settings_set_connection_parameters(self.device.board, 7.5, 7.5, 0, 6000)
             
+            #setup event loops
             self.accelCallback = FnVoid_VoidP_DataP(self.accelDataHandler)
             self.magCallback = FnVoid_VoidP_DataP(self.magDataHandler)
             self.gyroCallback = FnVoid_VoidP_DataP(self.gyroDataHandler)
             self.lightCallback = FnVoid_VoidP_DataP(self.lightDataHandler)
 
+            #set configurabe settings for each sensor's Rate and Range
+            self.XL_availSampleRate = MetaMotion.XL_availSampleRate
+            self.XL_availRange = MetaMotion.XL_availRange
+            self.GY_availSampleRate = MetaMotion.GY_availSampleRate
+            self.MG_availSampleRate = MetaMotion.MG_availSampleRate
+
+            #set default Sample Rates and Ranges
+            self.XL_SampleRate = 100
+            self.GY_SampleRate = 100
+            self.MG_SampleRate = 100
+
+            self.XL_Range = 2
+            self.GY_Range = 2
+            
+            self.MG_SampleRate = 10
+        
             print("Connected to device")
             return True
 
@@ -150,7 +179,7 @@ class MetaMotion(iSmartDot):
             print(parsedData)
             print(e)
 
-    def startMag(self,  dataRate : int, odr : None):  
+    def startMag(self):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
         #List of Valid Data as depicted from Metawear API
         magDataRates = {
@@ -164,8 +193,8 @@ class MetaMotion(iSmartDot):
                             MagBmm150Odr._30Hz : 30}
         
         #determine actual datarate based from finding value closest to parameter datarate
-        dataRate = min(magDataRates, key=lambda k: abs(magDataRates[k] - dataRate))
-        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, dataRate)
+        dataRate = min(magDataRates, key=lambda k: abs(magDataRates[k] - self.MG_SampleRate))
+        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, self.MG_SampleRate)
        
         self.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.magCallback)
@@ -185,9 +214,9 @@ class MetaMotion(iSmartDot):
     def startAccel(self, dataRate : int, range : int):
         
         print("Configuring Accelerometer")
-        libmetawear.mbl_mw_acc_set_odr(self.device.board, dataRate)
+        libmetawear.mbl_mw_acc_set_odr(self.device.board, self.XL_SampleRate)
         print("ODR SET")        
-        libmetawear.mbl_mw_acc_set_range(self.device.board, range)  
+        libmetawear.mbl_mw_acc_set_range(self.device.board, self.XL_Range)  
         print("RANGE SET")
         libmetawear.mbl_mw_acc_write_acceleration_config(self.device.board)
 
@@ -210,9 +239,9 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_acc_disable_acceleration_sampling(self.device.board)
         libmetawear.mbl_mw_datasignal_unsubscribe(self.accelSignal)
     
-    def startGyro(self, dataRate : int, range : int):
+    def startGyro(self):
         # Set ODR to 100Hz
-        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, 100)
+        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, self.GY_SampleRate)
 
         # Set data range to +/250 degrees per second
         libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, range)
@@ -234,7 +263,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_gyro_bmi160_disable_rotation_sampling(self.device.board)
         libmetawear.mbl_mw_datasignal_unsubscribe(self.gyroSig)
         
-    def startLight(self,  dataRate : int, odr : None):
+    def startLight(self):
         libmetawear.mbl_mw_als_ltr329_set_gain(self.device.board, AlsLtr329Gain._96X)
         libmetawear.mbl_mw_als_ltr329_set_integration_time(self.device.board, AlsLtr329IntegrationTime._400ms)
         libmetawear.mbl_mw_als_ltr329_set_measurement_rate(self.device.board, AlsLtr329MeasurementRate._1000ms)
@@ -271,4 +300,4 @@ class MetaMotion(iSmartDot):
     def turnOffLED(self):
         libmetawear.mbl_mw_led_stop_and_clear(self.device.board)
 
-
+    

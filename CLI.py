@@ -257,16 +257,19 @@ class CLI:
                 elif message.__len__() % 2 !=0 :
                     print("Unable to Parse Bytes with uneven amount of Hex")
                 else:
-                    bytesMessage : bytearray = []
+                    #whatever fucking works - Zach Cox
+                    
+                    bytesMessage = []
                     message=message[2:]
                     size= 0
                     
                     while(size + 1 < message.__len__()):
-                        byte = int(message[size:size+2].encode("utf-8"))
-                        bytesMessage.append(byte)
+                        bytesMessage.append(int(message[size:size+2], 16))
                         size = size+2
-                    bytesMessage = bytearray(bytesMessage)
-                    commsChannel.send(bytesMessage)
+                   
+                    bytesarrayMessage : bytearray = bytearray(bytesMessage)
+                    print(bytesarrayMessage)
+                    commsChannel.send(bytesarrayMessage)
                     #Give a chance for any immediate messages to come in
                 
                 time.sleep(.5)

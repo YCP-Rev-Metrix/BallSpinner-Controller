@@ -53,6 +53,9 @@ class BallSpinnerController():
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
                 ipAddr = s.getsockname()[0]
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+
 
         except Exception:
             # ERROR: Not Connected to Internet
@@ -134,10 +137,10 @@ class BallSpinnerController():
         self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
         #Instantly Setting the Start Configs for the 9DOF's to skip implementation
 
-        self.smartDot.startMag(10, 10)
-        self.smartDot.startAccel(100, 10)
-        self.smartDot.startGyro(100, 10) 
-        self.smartDot.startLight(100, 10)      
+        self.smartDot.startMag()
+        self.smartDot.startAccel()
+        self.smartDot.startGyro() 
+        self.smartDot.startLight()      
         print("All started")
         try:
             await self.wait_for_completion()
@@ -190,55 +193,63 @@ class BallSpinnerController():
                                 self.mode = BSCModes.IDLE
                                 pass
                             
-                            case(0x05): #SMARTDOT_SCAN Message
+                            case(0x05): #A_B_SCAN_FOR_SD Message
                                 #If the 
-                                if data[3:9].hex() == "000000000000":
-                                    print("Received: SMARTDOT_SCAN_INIT") if self.debug else None
+                                self.mode = BSCModes.BLUETOOTH_SCANNING
+                                self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
 
-                                    self.mode = BSCModes.BLUETOOTH_SCANNING
-                                    self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
-
-                                else:
+                            case(0x07): #
+                                try:
                                     self.scanner.cancel()
-                                    self.smartDot : iSmartDot = None
-                                    
-                                    smartDotMACStr = "%s:%s:%s:%s:%s:%s" % (data[3:4].hex(), 
-                                    data[4:5].hex(), data[5:6].hex(), data[6:7].hex(), data[7:8].hex(), 
-                                    data[8:9].hex())  
-                                    try: #if not in debug mode and application sends SMARTDOTEMULATOR String, 
-                                        if self.availDevicesType[smartDotMACStr] == SmartDotEmulator:
-                                            print("Simulator Selected")
-                                            self.smartDot = SmartDotEmulator()
-                                        else:
-                                            pass
-                                    except KeyError:
-                                        print("Application Sent Device Not Scanned")
+                                except Exception as e:
+                                    print(e)
 
-                                        print("Womp Womp") 
-                                        self.smartDot = MetaMotion()
-                                    print("Connecting to "+ smartDotMACStr)
-                                    if self.smartDot.connect(smartDotMACStr):   
-                                        bytesData = bytearray([0x06, 0x00, 0x06])
-                                        bytesData.extend(data[3:9]) 
-                                        print("Sending: 0x%s" % bytes(bytesData).hex())
-                                        self.commsChannel.send(bytesData)
-                                        self.mode = BSCModes.READY_FOR_INSTRUCTIONS
+                                self.smartDot : iSmartDot = None
+                                
+                                smartDotMACStr = "%s:%s:%s:%s:%s:%s" % (data[3:4].hex(), 
+                                data[4:5].hex(), data[5:6].hex(), data[6:7].hex(), data[7:8].hex(), 
+                                data[8:9].hex())  
+                                try: #if not in debug mode and application sends SMARTDOTEMULATOR String, 
+                                    if self.availDevicesType[smartDotMACStr] == SmartDotEmulator:
+                                        print("Simulator Selected")
+                                        self.smartDot = SmartDotEmulator()
                                     else:
-                                        self.smartDot = None
-                                        #NEED TO CHECK IF NOT TRUE, SEND ERROR
+                                        pass
+                                except KeyError:
+                                    #The Application sent an unscanned MAC Address
+                                    print("The Application Sent Device to Connect To Was Not a Valid MAC Address")
+                                    #This needs to be changed to have an error
+                                    print("Womp Womp") 
+                                    self.smartDot = MetaMotion()
+                                print("Connecting to "+ smartDotMACStr)
 
-                            case(0x08): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
+                                #Check if connection was successful
+                                if self.smartDot.connect(smartDotMACStr):   
+                                    bytesData = bytearray([0x08, 0x00, 0x08])
+                                    #bytesData.extend(data[3:9]) 
+                                    #determine rate and ranges
+                                    bytesData.extend(self.smartDot.sendConfigSettings())
+                                    self.commsChannel.send(bytesData)
+                                    self.mode = BSCModes.READY_FOR_INSTRUCTIONS
+                                else:
+                                    self.smartDot = None
+                                    #NEED TO CHECK IF NOT TRUE, SEND ERROR
+                            case(0x09):
+                                print(data)
+                                try:          
+                                    self.smartDotHandlerThread = asyncio.create_task(self.smartDotHandler())    
+                                except BrokenPipeError:
+                                    raise BrokenPipeError
+                                except Exception as e:
+                                    print("Unable to start thread")
+                                    print(e)
+                                    
+                                    
+                            case(0x0C): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 
                                     print("Initializing Sensors")
                                     # First Motor Instruction:         
-                                    try:          
-                                        self.smartDotHandlerThread = asyncio.create_task(self.smartDotHandler())    
-                                    except BrokenPipeError:
-                                        raise BrokenPipeError
-                                    except Exception as e:
-                                        print("Unable to start thread")
-                                        print(e)
                                     #Turn On Motors
                                     print("Turning on motors")
                                     self.PrimMotor = Motor(22)

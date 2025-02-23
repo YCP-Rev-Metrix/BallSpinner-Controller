@@ -60,9 +60,7 @@ class MetaMotion(iSmartDot):
             self.MG_availSampleRate = MetaMotion.MG_availSampleRate
 
             #set default Sample Rates and Ranges
-            self.XL_SampleRate = 100
-            self.GY_SampleRate = 100
-            self.MG_SampleRate = 100
+            self.setSampleRates(XL=100, GY=100, MG=10)
 
             self.XL_Range = 2
             self.GY_Range = 2
@@ -71,11 +69,6 @@ class MetaMotion(iSmartDot):
         
             print("Connected to device")
             return True
-
-        #Timeout occured and Connection was unsuccessful     
-        #except:
-        #    print("Unable to connect to device")
-        #    return False
     
     def accelDataHandler(self, ctx, data): 
         #Parse data into Cartesian Values
@@ -181,20 +174,7 @@ class MetaMotion(iSmartDot):
 
     def startMag(self):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
-        #List of Valid Data as depicted from Metawear API
-        magDataRates = {
-                            MagBmm150Odr._2Hz  :  2, 
-                            MagBmm150Odr._6Hz  :  6,
-                            MagBmm150Odr._8Hz  :  8,
-                            MagBmm150Odr._10Hz : 10,
-                            MagBmm150Odr._15Hz : 15,
-                            MagBmm150Odr._20Hz : 20,
-                            MagBmm150Odr._25Hz : 25,
-                            MagBmm150Odr._30Hz : 30}
-        
-        #determine actual datarate based from finding value closest to parameter datarate
-        dataRate = min(magDataRates, key=lambda k: abs(magDataRates[k] - self.MG_SampleRate))
-        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, self.MG_SampleRate)
+        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, magDataRates[self.MG_SampleRate])
        
         self.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.magCallback)
@@ -300,4 +280,33 @@ class MetaMotion(iSmartDot):
     def turnOffLED(self):
         libmetawear.mbl_mw_led_stop_and_clear(self.device.board)
 
-    
+    def setSampleRates(self, XL=None, GY=None, MG=None, LT=None):
+        if XL != None: 
+            self.XL_SampleRate = XL
+        
+        if GY != None: self.GY_SampleRate = GY
+        
+        if MG != None: 
+            #Create Mapping of Enums to Sample Rates
+
+            #List of Valid Data as depicted from Metawear API
+            magDataRates = {
+                    MagBmm150Odr._2Hz  :  2, 
+                    MagBmm150Odr._6Hz  :  6,
+                    MagBmm150Odr._8Hz  :  8,
+                    MagBmm150Odr._10Hz : 10,
+                    MagBmm150Odr._15Hz : 15,
+                    MagBmm150Odr._20Hz : 20,
+                    MagBmm150Odr._25Hz : 25,
+                    MagBmm150Odr._30Hz : 30}
+            
+            #Calculate Closest sample rate of what was entered vs. what is possible to set
+            dataRate = min(magDataRates, key=lambda k: abs(magDataRates[k] - MG))
+
+            print("Magnetometer Set To %sHz " % magDataRates[dataRate])
+            
+            #Choose Enum associated with set value
+            magDataRates = tuple(magDataRates.keys())
+            self.MG_SampleRate = magDataRates[dataRate]
+
+        if LT != None: self.LT_SampleRate = LT

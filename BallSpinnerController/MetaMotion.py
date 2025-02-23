@@ -14,10 +14,10 @@ from .iSmartDot import iSmartDot
 
 class MetaMotion(iSmartDot):
 
-    XL_availSampleRate = [12.5, 25, 50, 100, 200, 400, 800, 1600]
+    XL_availSampleRate = [12.5, 25, 50, 100, 200, 400, 800]
     XL_availRange = [2,4,8,16]
 
-    GY_availSampleRate = [25, 50, 100, 200, 400, 800,1600,3200,6400]
+    GY_availSampleRate = [25, 50, 100, 200, 400, 800, 1600]
     GY_availRange = [125,250,500,1000,2000]
 
     

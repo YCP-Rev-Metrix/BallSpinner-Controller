@@ -10,7 +10,8 @@ class Motor():
         #Configure GPIO Pin
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
-
+        
+        GPIO.setup(GPIOPin, GPIO.OUT)
         #1kHz
         self.PWM = GPIO.PWM(GPIOPin, 500)
         #Declare on/off State (0 = Off; 1 = On)

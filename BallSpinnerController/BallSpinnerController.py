@@ -47,7 +47,8 @@ class BallSpinnerController():
         
         #determine global ip address
         self.iSmartDot = None
-        
+        self.scanner = None
+                                
         print("Debug Mode: ON") if self.debug else None 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -60,7 +61,12 @@ class BallSpinnerController():
         except Exception:
             # ERROR: Not Connected to Internet
             pass 
-        self.socketHandler(ipAddr)
+        
+        while(True):
+            try:
+                self.socketHandler(ipAddr)
+            except BrokenPipeError:
+                pass
 
     def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
@@ -79,13 +85,15 @@ class BallSpinnerController():
                     asyncio.run(self.commsHandler()) 
             except OSError: #Raised if Comms is forcibly closed by resetCommsPort while waiting for message
                 print("Socket Closed, must restart")   
-
             except KeyboardInterrupt:
+                #When user presses cancel, attempt to close ports properly
                 print("Crashed by User")
                 self.commsChannel.close()
                 self.commsPort.close()
-    
                 exit(0)
+            except BrokenPipeError:
+                print("Socket Closed Ubruptly, must restart")
+                pass
 
     def resetCommsPort(self):
         self.smartDot.stopGyro()
@@ -125,7 +133,7 @@ class BallSpinnerController():
                 raise BrokenPipeError
 
         def lightDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x0A, 0x00, 0x13, 0x4C])
+            bytesData = bytearray([0x0B, 0x00, 0x13, 0x4C])
             bytesData.extend(dataBytes)
             #Add 0's to "Y and Z values"
             bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
@@ -196,11 +204,14 @@ class BallSpinnerController():
                             case(0x05): #A_B_START_SCAN_FOR_SD Message
                                 #If the 
                                 self.mode = BSCModes.BLUETOOTH_SCANNING
-                                self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
+                                
+                                #Confirm only one Scanner is open
+                                if self.scanner == None:
+                                    self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
 
                             case(0x07): #A_B_CHOSEN_SD Message
                                 try:
-                                    self.scanner.cancel()
+                                    print(self.scanner.cancel())
                                 except Exception as e:
                                     print(e)
 
@@ -214,11 +225,6 @@ class BallSpinnerController():
                                 print(self.availDevicesType)
                                 print(smartDotMACStr)
                                 try: #if not in debug mode and application sends SMARTDOTEMULATOR String, 
-                                   # if self.availDevicesType[smartDotMACStr] == SmartDotEmulator:
-                                    #    print("Simulator Selected")
-                                    #    self.smartDot = SmartDotEmulator()
-                                   # elif type() == MetaMotion:
-                                    #    print("MetaMotion Selected")
                                     self.smartDot = self.availDevicesType[smartDotMACStr]
                                     #delete rest of SD instances
                                 except KeyError:
@@ -303,7 +309,11 @@ class BallSpinnerController():
                                 
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
-                    sys.exit(1)
+                    raise BrokenPipeError
+                except Exception as e:
+                    print("Error Occured Somewhere in BSC: {e}")
+                    print("Restarting Pipe")
+                    raise BrokenPipeError
             
 
 
@@ -329,15 +339,19 @@ class BallSpinnerController():
             #Debug is on, manually add SmartDotEmulator to scanned devices
             self.availDevices["11:11:11:11:11:11"] = "smartDotSimulator" 
             self.availDevicesType["11:11:11:11:11:11"] = smartDot[1]
-
+        
+        bleScannerRunning = True
         BleScanner.set_handler(handler)
-        BleScanner.start()
+        BleScanner.start(scan_type='active')
         
         try :
             i = 0
             while True: 
                 #update list every 5s
-                await asyncio.sleep(1.0)  
+                try:
+                    await asyncio.sleep(1.0)  
+                except asyncio.CancelledError:
+                    break
 
                 #print all BLE devices found and append to connectable list                
                 count = 0
@@ -362,8 +376,16 @@ class BallSpinnerController():
                     
                 
 
-        except asyncio.CancelledError: #Called when KeyInterrut ^C is called
-            BleScanner.stop()
+        except asyncio.CancelledError: #Called when BLE Thread is stopped
+            pass
+
+        except BrokenPipeError:
+            pass
+
+        finally:
+            if bleScannerRunning: 
+                BleScanner.stop()
+                bleScannerRunning = False
 
 #Scans all modules to see which to connect to
 async def scanAll() -> dict:

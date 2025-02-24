@@ -95,8 +95,10 @@ class MetaMotion(iSmartDot):
             self.accelDataSig(mess)
             #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
-        except:    
+        except Exception as e:
             print(parsedData)
+            print(e)
+
 
     def magDataHandler(self, ctx, data):
         #Parse data into Cartesian Values
@@ -124,7 +126,7 @@ class MetaMotion(iSmartDot):
             self.magDataSig(mess)
             #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
         except Exception as e:
-            print(f"Unexpected error in accelDataHandler: {e}")
+            print(f"Unexpected error in MGDataHandler: {e}")
             print(parsedData)
 
     def gyroDataHandler(self, ctx, data):
@@ -151,9 +153,11 @@ class MetaMotion(iSmartDot):
         
         try: # Check if TCP connection is set up, if not, just print in terminal
             self.gyroDataSig(mess)
-            print("Encoded Data " + xValInBytes + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
-        except:
+           # print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+        except Exception as e:
             print(parsedData)
+            print(e)
+
             
     def lightDataHandler(self, ctx, data):
         parsedData = parse_value(data)
@@ -174,7 +178,7 @@ class MetaMotion(iSmartDot):
 
     def startMag(self):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
-        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, magDataRates[self.MG_SampleRate])
+        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, self.MG_SampleRate)
        
         self.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.magCallback)
@@ -191,7 +195,7 @@ class MetaMotion(iSmartDot):
     def disconnect(self):
         self.device.disconnect()
       
-    def startAccel(self, dataRate : int, range : int):
+    def startAccel(self):
         
         print("Configuring Accelerometer")
         libmetawear.mbl_mw_acc_set_odr(self.device.board, self.XL_SampleRate)
@@ -224,7 +228,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, self.GY_SampleRate)
 
         # Set data range to +/250 degrees per second
-        libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, range)
+        libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, self.GY_Range)
 
         # Write the changes to the sensor
         libmetawear.mbl_mw_gyro_bmi160_write_config(self.device.board)

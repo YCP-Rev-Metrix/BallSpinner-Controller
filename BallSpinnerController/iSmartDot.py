@@ -39,7 +39,7 @@ class iSmartDot(metaclass=ABCMeta):
         self.lightDataSig = lightDataSig
 
     @abstractmethod
-    def startMag(self,  dataRate : int, odr : None):   
+    def startMag(self):   
         pass
 
     @abstractmethod
@@ -47,7 +47,7 @@ class iSmartDot(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def startAccel(self, dataRate : int, range : int):
+    def startAccel(self):
         pass
 
     @abstractmethod
@@ -55,7 +55,7 @@ class iSmartDot(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def startGyro(self, dataRate : int, range : int):
+    def startGyro(self):
         pass
 
     @abstractmethod
@@ -63,7 +63,7 @@ class iSmartDot(metaclass=ABCMeta):
         pass
     
     @abstractmethod
-    def startLight(self,  dataRate : int, odr : None):
+    def startLight(self):
         pass
 
     @abstractmethod

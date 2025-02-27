@@ -1,7 +1,9 @@
 from BallSpinnerController.iSmartDot import iSmartDot
 from BallSpinnerController.MetaMotion import MetaMotion
 from BallSpinnerController.SmartDotEmulator import SmartDotEmulator
-from BallSpinnerController.Motor import Motor
+#from BallSpinnerController.Motor import Motor
+from BallSpinnerController.iMotor import iMotor
+from BallSpinnerController.StepperMotor import StepperMotor as Motor
 from mbientlab.warble import BleScanner
 import six
 import time
@@ -27,9 +29,10 @@ class CLI:
         #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
         def handler(result):
             for listedConnect in range(len(self.smartDot)):
-                #if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
-                    print("Device Found")
+                if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
                     self.availDevices[result.mac] = result.name
+                    if(isinstance(self.smartDot[listedConnect],MetaMotion)):
+                            self.availDevicesType[result.mac] = MetaMotion
 
         BleScanner.set_handler(handler)
         BleScanner.start()
@@ -102,41 +105,34 @@ class CLI:
                 
             elif consInput == "5":
                 print("Select Rate")
-                odr = input()
+                smartDot.setSampleRates(XL=int(input()))
                 print("Select Range")
-                range = input()
+                smartDot.setRanges(XL=int(input()))
                 print("Poll for How long?")
                 timeForAccel = input()
-                smartDot.startAccel(int(odr), int(range))
+                smartDot.startAccel()
                 time.sleep(int(timeForAccel))
                 smartDot.stopAccel()
 
             elif consInput == "6":
                 print("Select Rate")
-                odr = input()
+                smartDot.setSampleRates(GY=int(input()))
                 print("Select Range")
-                range = input()
+                smartDot.setRanges(GY=int(input()))
                 print("Poll for How long?")
                 timeForGyro = input()
-                smartDot.startGyro(int(odr), int(range))
+                smartDot.startGyro()
                 time.sleep(int(timeForGyro))
                 smartDot.stopGyro()
 
             elif consInput == "7":
                 print("Select Rate")
-                print("[1] 10 Hz")
-                print("[2] 20 Hz")
-
-                dataRate = input()
+                smartDot.setSampleRates(MG=int(input()))
+                print("Select Range")
+                smartDot.setRanges(MG=int(input()))
                 print("Poll for How long?")
                 timeForMag = input()
-                if dataRate == "1":
-                    smartDot.startMag(10, None)
-                elif dataRate == "2":
-                    smartDot.startMag(20, None)
-                else:
-                    print("Too bad, polling at 10Hz")
-                    smartDot.startMag(10, None)
+                smartDot.startMag()
 
                 time.sleep(int(timeForMag))
                 smartDot.stopMag()
@@ -191,7 +187,7 @@ class CLI:
 
             
             elif motors.__getitem__(int(motorNum)).state:
-                print("What are you changing the Duty Cycle?")
+                print("What is the RPM?")
                 consInput = input()
                 motors[int(motorNum)].changeSpeed(int(consInput))
 

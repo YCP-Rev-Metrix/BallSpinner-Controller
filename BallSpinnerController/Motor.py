@@ -33,7 +33,10 @@ class Motor():
         else:
             print("Unable to Stop Motor: Motor is Not Running")
 
-    def changeSpeed(self, dutyCycle : int):
+    def changeSpeed(self, rpm : int):
+        #Hard-Coded Max Shunt Motor rpm
+        dutyCycle = (rpm/60) * 100
+        if dutyCycle > 100: dutyCycle = 100
         print("Changing Speed %i%%" % dutyCycle)
         if self.state:
             self.PWM.ChangeDutyCycle(dutyCycle)

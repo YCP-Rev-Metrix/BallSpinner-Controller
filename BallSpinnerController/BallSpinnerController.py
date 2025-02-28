@@ -12,6 +12,7 @@ import struct
 import sys
 from time import sleep
 from enum import Enum
+from.Protocol import *
 
 # class syntax
 class BSCModes(Enum):
@@ -73,6 +74,7 @@ class BallSpinnerController():
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.commsPort.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_address = (ipAddr, 8411)  # Replace 'localhost' with the server's IP if needed
             print('Server listening on {}:{}'.format(*server_address))
             self.commsPort.bind(server_address)
@@ -85,6 +87,10 @@ class BallSpinnerController():
                     asyncio.run(self.commsHandler()) 
             except OSError: #Raised if Comms is forcibly closed by resetCommsPort while waiting for message
                 print("Socket Closed, must restart")   
+                self.commsChannel.shutdown(socket.SHUT_RDWR)
+                self.commsPort.shutdown(socket.SHUT_RDWR)
+                self.commsChannel.close()
+                self.commsPort.close()
             except KeyboardInterrupt:
                 #When user presses cancel, attempt to close ports properly
                 print("Crashed by User")
@@ -108,7 +114,8 @@ class BallSpinnerController():
     async def smartDotHandler(self):
         print("Handling SmartDot:")
         def accelDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x0B, 0x00, 0x13, 0x41]) # Send B_A_SD_SENSOR_DATA for XL  
+            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
@@ -116,7 +123,8 @@ class BallSpinnerController():
                 raise self.resetCommsPort()
 
         def magDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x0B, 0x00, 0x13, 0x4D]) # Send B_A_SD_SENSOR_DATA for MG
+            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                    0x00, 0x13, 0x4D]) # Send B_A_SD_SENSOR_DATA for MG
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
@@ -124,7 +132,8 @@ class BallSpinnerController():
                 raise self.resetCommsPort()
         
         def gyroDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x0B, 0x00, 0x13, 0x47]) # Send B_A_SD_SENSOR_DATA for XL
+            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                    0x00, 0x13, 0x47]) # Send B_A_SD_SENSOR_DATA for XL
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
@@ -133,15 +142,16 @@ class BallSpinnerController():
                 raise BrokenPipeError
 
         def lightDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x0B, 0x00, 0x13, 0x4C])
+            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                    0x00, 0x13, 0x4C])
             bytesData.extend(dataBytes)
             #Add 0's to "Y and Z values"
             bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
-            print("Sending Light")
-            print(int(struct.unpack('>I', b'\x00' + bytesData[4:7])[0]))
             try:
                 self.commsChannel.sendall(bytesData)
+                print(bytesData)
             except Exception as e:
+                print(e)
                 self.resetCommsPort()
                 raise BrokenPipeError
             
@@ -176,7 +186,7 @@ class BallSpinnerController():
                     if not data == b'':
                         print("Received: %s" % data.hex())  if not self.debug else None
                         match data[0]: 
-                            case(0x01): #A_B_INIT_HANDSHAKE 
+                            case(MsgType.A_B_INIT_HANDSHAKE): #A_B_INIT_HANDSHAKE 
                                 #Message Received: | Msg Type: 0x01 | Msg Size: 0x0001 | RandomByte: XXXX 
                                 print("Received: APP_INIT Message") if self.debug else None
                                 if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
@@ -187,21 +197,21 @@ class BallSpinnerController():
                                 else:                   
                                     print("Sending: APP_INIT_ACK Message") if self.debug else None
                                     #Grab Random Byte from third and resend
-                                    bytesData = bytearray([0x02, 0x00, 0x01, data[3]]) # Send B_A_INIT_HANDSHAKE_ACK
+                                    bytesData = bytearray([MsgType.B_A_INIT_HANDSHAKE_ACK, 0x00, 0x01, data[3]]) # Send B_A_INIT_HANDSHAKE_ACK
                                     self.commsChannel.send(bytesData)
                                     self.mode = BSCModes.IDLE
 
-                            case(0x03): #A_B_NAME_REQ Message
+                            case(MsgType.A_B_NAME_REQ): #A_B_NAME_REQ Message
                                 print("Looking For Pi")
                                 name : str = "Ball Spinner Controller"
-                                bytesData =bytearray([0x04, 0x00, name.__len__()]) # Send B_A_NAME
+                                bytesData =bytearray([MsgType.B_A_NAME, 0x00, name.__len__()]) # Send B_A_NAME
                                 bytesData.extend(name.encode("utf-8"))
                                 print(bytes(bytesData))
                                 self.commsChannel.send(bytesData)
                                 self.mode = BSCModes.IDLE
                                 pass
                             
-                            case(0x05): #A_B_START_SCAN_FOR_SD Message
+                            case(MsgType.A_B_START_SCAN_FOR_SD): #A_B_START_SCAN_FOR_SD Message
                                 #If the 
                                 self.mode = BSCModes.BLUETOOTH_SCANNING
                                 
@@ -209,7 +219,7 @@ class BallSpinnerController():
                                 if self.scanner == None:
                                     self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
 
-                            case(0x07): #A_B_CHOSEN_SD Message
+                            case(MsgType.A_B_CHOSEN_SD): #A_B_CHOSEN_SD Message
                                 try:
                                     print(self.scanner.cancel())
                                 except Exception as e:
@@ -246,7 +256,7 @@ class BallSpinnerController():
                                     self.smartDot = None
                                     #NEED TO CHECK IF NOT TRUE, SEND ERROR
                             
-                            case(0x09): #A_B_RECEIVE_CONFIG_INFO
+                            case(MsgType.A_B_RECEIVE_CONFIG_INFO): #A_B_RECEIVE_CONFIG_INFO
                                 print(data)
                                 XLConfigSampleRate = data[3] >> 4 # Parse XL Bytes
 
@@ -256,7 +266,7 @@ class BallSpinnerController():
                                 XLConfigSampleRate = XLSampleRates[XLConfigSampleRate]
                                 print("Setting XL Rate to %i" % XLConfigSampleRate)    
 
-                            case(0x0C): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
+                            case(MsgType.A_B_MOTOR_INSTRUCTIONS): #MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 
                                     print("Initializing Sensors")
@@ -283,11 +293,11 @@ class BallSpinnerController():
 
                                     self.mode = BSCModes.TAKING_SHOT_DATA
                                 
-                                self.PrimMotor.changeSpeed(int(data[3]/30*100)) 
-                                self.secMotor1.changeSpeed(int(data[4]/12*100)) 
-                                self.secMotor2.changeSpeed(int(data[5]/12*100))
+                                self.PrimMotor.changeSpeed(int(data[3])) 
+                                self.secMotor1.changeSpeed(int(data[4])) 
+                                self.secMotor2.changeSpeed(int(data[5]))
 
-                            case(0x0B): #STOP_MOTOR_INSTRUCTIONS
+                            case(MsgType.A_B_STOP_MOTOR): #STOP_MOTOR_INSTRUCTIONS
                                 
                                     print("Received Stop Function")
                                     #Stop Motors
@@ -306,6 +316,10 @@ class BallSpinnerController():
                                     self.smartDot.stopMag()
                                     self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                                     self.smartDotHandlerThread.cancel()
+
+                            case(MsgType.A_B_DISCONNECT_FROM_BSC):
+                                #Raise the BokenPipeError, as the Communication Line is disconnected
+                                raise BrokenPipeError
                                 
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
@@ -361,7 +375,7 @@ class BallSpinnerController():
 
                     #Pack Message So Lenght fits in 2 bytes
                     messLen = struct.pack(">I", (6 + name.__len__()))[2:4]
-                    bytesData = bytearray([0x06])
+                    bytesData = bytearray([MsgType.B_A_SCANNED_SD])
                     bytesData.extend(messLen) 
                     bytesData.extend(bytearray([                    
                                         int(address[0:2],16),

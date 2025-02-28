@@ -39,7 +39,8 @@ class bitMappings():
     
     def sendConfigSettings(XL_availSampleRate, XL_availRange,
                            GY_availSampleRate, GY_availRange,
-                           MG_availSampleRate, MG_availRange):
+                           MG_availSampleRate, MG_availRange,
+                           LT_availSampleRate, LT_availRange,):
         
         # Pre-allocate array
         configSettingsBytes = bytearray([0, 0, 0, 0, 0, 0, 0, 0])
@@ -80,22 +81,34 @@ class bitMappings():
 
 
         for x in MG_availSampleRate:
-            if x == 12.5:  configSettingsBytes[4] |= 1
-            if x ==   25:  configSettingsBytes[4] |= 2
-            if x ==   50:  configSettingsBytes[4] |= 4
-            if x ==  100:  configSettingsBytes[4] |= 8
-            if x ==  200:  configSettingsBytes[4] |= 16
-            if x ==  400:  configSettingsBytes[4] |= 32
-            if x ==  800:  configSettingsBytes[4] |= 64
-            if x ==  1600: configSettingsBytes[4] |= 128
+            if x ==    2:  configSettingsBytes[4] |= 1
+            if x ==    6:  configSettingsBytes[4] |= 2
+            if x ==    8:  configSettingsBytes[4] |= 4
+            if x ==   10:  configSettingsBytes[4] |= 8
+            if x ==   15:  configSettingsBytes[4] |= 16
+            if x ==   20:  configSettingsBytes[4] |= 32
+            if x ==   25:  configSettingsBytes[4] |= 64
+            if x ==   30:  configSettingsBytes[4] |= 128
 
         for x in MG_availRange:
-            if x ==    2:  configSettingsBytes[3] |= 1
-            if x ==    4:  configSettingsBytes[3] |= 2
-            if x ==    8:  configSettingsBytes[3] |= 4
-            if x ==   16:  configSettingsBytes[3] |= 8
+            if x ==    2500:  configSettingsBytes[5] |= 1
 
+        for x in LT_availSampleRate:
+            if x ==    .0005:  configSettingsBytes[6] |= 1
+            if x ==    .001:  configSettingsBytes[6] |= 2
+            if x ==    .01:  configSettingsBytes[6] |= 4
+            if x ==   .02:  configSettingsBytes[6] |= 8
+            if x ==   .002:  configSettingsBytes[6] |= 16
 
+            
+        for x in LT_availRange:
+            if x ==    600:  configSettingsBytes[7] |= 1
+            if x ==    1300:  configSettingsBytes[7] |= 2
+            if x ==    8000:  configSettingsBytes[7] |= 4
+            if x ==   16000:  configSettingsBytes[7] |= 8
+            if x ==   32000:  configSettingsBytes[7] |= 16
+            if x ==   64000:  configSettingsBytes[7] |= 32
+   
         '''
         for x in self.smartDot.XL_availSampleRate:
         if x ==    2: XL_rangeByte |= 1
@@ -103,3 +116,4 @@ class bitMappings():
         if x ==    8: XL_rangeByte |= 4
         if x ==   16: XL_rateByte  |= 8
         '''     
+        return configSettingsBytes

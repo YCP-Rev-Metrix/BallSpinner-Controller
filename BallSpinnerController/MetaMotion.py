@@ -21,11 +21,11 @@ class MetaMotion(iSmartDot):
     GY_availRange = [125,250,500,1000,2000]
 
     
-    MG_availSampleRate = []
-    MG_availRange = []
+    MG_availSampleRate = [2, 4, 6, 8, 10, 15, 20, 25, 30]
+    MG_availRange      = [2500]
 
-    LT_availSampleRate = []
-    LT_availRange = []
+    LT_availSampleRate = [.0005, .001, .01, .02, .002]
+    LT_availRange = [600, 1300, 8000, 16000, 32000, 64000]
     
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75a"
@@ -57,10 +57,15 @@ class MetaMotion(iSmartDot):
             self.XL_availSampleRate = MetaMotion.XL_availSampleRate
             self.XL_availRange = MetaMotion.XL_availRange
             self.GY_availSampleRate = MetaMotion.GY_availSampleRate
+            self.GY_availRange = MetaMotion.GY_availSampleRate
             self.MG_availSampleRate = MetaMotion.MG_availSampleRate
+            self.MG_availRange = MetaMotion.MG_availRange
+            self.LT_availRange = MetaMotion.LT_availRange
+            self.LT_availSampleRate = MetaMotion.LT_availSampleRate
 
             #set default Sample Rates and Ranges
             self.setSampleRates(XL=100, GY=100, MG=10)
+            #self.setSampleRanges(XL=100, GY=100, MG=10)
 
             self.XL_Range = 2
             self.GY_Range = 2
@@ -288,7 +293,8 @@ class MetaMotion(iSmartDot):
         if XL != None: 
             self.XL_SampleRate = XL
         
-        if GY != None: self.GY_SampleRate = GY
+        if GY != None: 
+            self.GY_SampleRate = GY
         
         if MG != None: 
             #Create Mapping of Enums to Sample Rates

@@ -249,7 +249,10 @@ class BallSpinnerController():
                                     bytesData = bytearray([0x08, 0x00, 0x08]) #send B_A_RECEIVE_CONFIG_INFO
                                     #bytesData.extend(data[3:9]) 
                                     #determine rate and ranges
-                                    bytesData.extend(self.smartDot.sendConfigSettings())
+                                    bytesData.extend(bitMappings.sendConfigSettings(self.smartDot.XL_availSampleRate, self.smartDot.XL_availRange,
+                                                                                    self.smartDot.GY_availSampleRate, self.smartDot.XL_availRange,
+                                                                                    self.smartDot.MG_availSampleRate, self.smartDot.MG_availRange,
+                                                                                    self.smartDot.LT_availSampleRate, self.smartDot.LT_availRange))
                                     self.commsChannel.send(bytesData)
                                     self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                                 else:
@@ -325,7 +328,7 @@ class BallSpinnerController():
                     print("Pipe Error Caught in CommsHandler")
                     raise BrokenPipeError
                 except Exception as e:
-                    print("Error Occured Somewhere in BSC: {e}")
+                    print(f"Error Occured Somewhere in BSC: {e}")
                     print("Restarting Pipe")
                     raise BrokenPipeError
             

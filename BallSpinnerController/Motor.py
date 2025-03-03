@@ -18,7 +18,8 @@ class Motor():
         self.state = False
 
     # Turns on Motor at Specified Power (Duty Cycle)
-    def turnOnMotor(self, dutyCycle = 100):
+    def turnOnMotor(self, rpm = 1):
+        dutyCycle = (rpm/60) * 100
         if not self.state:
             self.PWM.start(dutyCycle)
             self.state = True

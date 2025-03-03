@@ -11,6 +11,7 @@ class iSmartDot(metaclass=ABCMeta):
                 hasattr(subclass, 'disconnect'))    
 
     def setSampleRates(self, XL=None, GY=None, MG=None, LT=None):
+        #TOOD Move to SDE and make this abstract
         #Set any Sampling Rates that were passed in
         if XL != None: self.XL_SampleRate = XL
         if GY != None: self.GY_SampleRate = GY
@@ -18,6 +19,8 @@ class iSmartDot(metaclass=ABCMeta):
         if LT != None: self.LT_SampleRate = LT
 
     def setRanges(self, XL=None, GY=None, MG=None, LT=None):
+        #TOOD Move to SDE and make this abstract
+
         #Set any Sampling Rates that were passed in
         if XL != None: self.XL_Range = XL
         if GY != None: self.GY_Range = GY

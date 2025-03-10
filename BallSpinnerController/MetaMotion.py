@@ -57,7 +57,7 @@ class MetaMotion(iSmartDot):
             self.XL_availSampleRate = MetaMotion.XL_availSampleRate
             self.XL_availRange = MetaMotion.XL_availRange
             self.GY_availSampleRate = MetaMotion.GY_availSampleRate
-            self.GY_availRange = MetaMotion.GY_availSampleRate
+            self.GY_availRange = MetaMotion.GY_availRange
             self.MG_availSampleRate = MetaMotion.MG_availSampleRate
             self.MG_availRange = MetaMotion.MG_availRange
             self.LT_availRange = MetaMotion.LT_availRange

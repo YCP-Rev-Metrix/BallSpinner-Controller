@@ -1,4 +1,6 @@
 import asyncio
+import random
+import os
 import threading
 import subprocess
 from mbientlab.warble import BleScanner
@@ -13,7 +15,7 @@ import sys
 from time import sleep
 from enum import Enum
 from.Protocol import *
-
+from .HMI import UI
 # class syntax
 class BSCModes(Enum):
     STARTUP = 0
@@ -35,7 +37,7 @@ class BSCModes(Enum):
     
 class BallSpinnerController():
 
-    def __init__(self, debug="0", name="Ball Spinner Controller"):
+    def __init__(self, shared_data, debug="0", name="Ball Spinner Controller"):
         #Before Anything, Check if user has raised permissions
         try:
             #Manually Raise Permissiosn, if Possible
@@ -49,7 +51,10 @@ class BallSpinnerController():
         #determine global ip address
         self.iSmartDot = None
         self.scanner = None
-                                
+
+        #Create shared dictionary for HMI(GUI)
+        self.shared_data = shared_data
+    
         print("Debug Mode: ON") if self.debug else None 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -63,11 +68,23 @@ class BallSpinnerController():
             # ERROR: Not Connected to Internet
             pass 
         
+
         while(True):
             try:
+                # self.launchHMI()
                 self.socketHandler(ipAddr)
             except BrokenPipeError:
                 pass
+
+    #Intended to launch the HMI and add it to the asyncio execution as a simulated thread
+    def launchHMI(self):
+        print("Attempting to laucnh HMI")
+        if os.environ.get("DISPLAY") is None:
+            print("No display detected. Running without GUI.")
+        else:
+            self.hmi = UI(self.shared_data)
+            self.hmi.check_for_updates()
+            self.hmi.run()
 
     def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
@@ -76,6 +93,7 @@ class BallSpinnerController():
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.commsPort.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_address = (ipAddr, 8411)  # Replace 'localhost' with the server's IP if needed
+            self.shared_data["ip"] = f"{ipAddr}:{8411}"
             print('Server listening on {}:{}'.format(*server_address))
             self.commsPort.bind(server_address)
 
@@ -84,7 +102,8 @@ class BallSpinnerController():
             self.commsChannel, clientIp  = self.commsPort.accept()
             self.commsChannel.setblocking(True)
             try:
-                    asyncio.run(self.commsHandler()) 
+                asyncio.run(self.commsHandler()) 
+
             except OSError: #Raised if Comms is forcibly closed by resetCommsPort while waiting for message
                 print("Socket Closed, must restart")   
                 self.commsChannel.shutdown(socket.SHUT_RDWR)
@@ -250,7 +269,7 @@ class BallSpinnerController():
                                     #bytesData.extend(data[3:9]) 
                                     #determine rate and ranges
                                     bytesData.extend(bitMappings.sendConfigSettings(self.smartDot.XL_availSampleRate, self.smartDot.XL_availRange,
-                                                                                    self.smartDot.GY_availSampleRate, self.smartDot.XL_availRange,
+                                                                                    self.smartDot.GY_availSampleRate, self.smartDot.GY_availRange,
                                                                                     self.smartDot.MG_availSampleRate, self.smartDot.MG_availRange,
                                                                                     self.smartDot.LT_availSampleRate, self.smartDot.LT_availRange))
                                     self.commsChannel.send(bytesData)

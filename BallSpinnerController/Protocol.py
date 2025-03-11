@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class MsgType:
+class MsgType(Enum):
 
     #Section 1 Protocol
     A_B_INIT_HANDSHAKE = 0x01

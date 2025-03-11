@@ -93,7 +93,7 @@ class BallSpinnerController():
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.commsPort.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_address = (ipAddr, 8411)  # Replace 'localhost' with the server's IP if needed
-            self.shared_data["ip"] = f"{ipAddr}:{8411}"
+            self.shared_data["ip"] = f"Socket: {ipAddr}:{8411}"
             print('Server listening on {}:{}'.format(*server_address))
             self.commsPort.bind(server_address)
 
@@ -204,7 +204,15 @@ class BallSpinnerController():
                     #parse message
                     if not data == b'':
                         print("Received: %s" % data.hex())  if not self.debug else None
+                        
+                        #Pass the last message to the HMI
+                        message_type = MsgType(data[0])
+                        if message_type is not None:
+                            self.shared_data["message_type"] = message_type.name
+
                         match data[0]: 
+                            #shared_data["message_type"] =
+                            #shared_data["message_type"] = message_enum.name
                             case(MsgType.A_B_INIT_HANDSHAKE): #A_B_INIT_HANDSHAKE 
                                 #Message Received: | Msg Type: 0x01 | Msg Size: 0x0001 | RandomByte: XXXX 
                                 print("Received: APP_INIT Message") if self.debug else None

@@ -13,7 +13,7 @@ if __name__ == "__main__":
             "mg": "",
             "lt": "",
             "mode": "",
-            "last_message": "",
+            "message_type": "",
             "bg_color": 'dodgerblue2',
             "geometry": "600x300",  # Set the window size to 600x300 pixels
             "title": "Ball Spinner Controller GUI",

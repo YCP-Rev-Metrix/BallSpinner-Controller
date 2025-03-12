@@ -344,6 +344,7 @@ class BallSpinnerController():
                                     self.smartDot.stopAccel()
                                     self.smartDot.stopGyro()
                                     self.smartDot.stopMag()
+                                    self.smartDot.stopLight()
                                     self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                                     self.smartDotHandlerThread.cancel()
 

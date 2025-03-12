@@ -266,7 +266,10 @@ class MetaMotion(iSmartDot):
         self.LightSampleCount = 0
 
     def stopLight(self):
-        pass
+        libmetawear.mbl_mw_als_ltr329_stop(self.device.board)
+        libmetawear.mbl_mw_datasignal_unsubscribe(self.lightSig)
+
+
 
     def turnOnRedLED(self):
         pattern = LedPattern(delay_time_ms= 5000, repeat_count= Const.LED_REPEAT_INDEFINITELY)

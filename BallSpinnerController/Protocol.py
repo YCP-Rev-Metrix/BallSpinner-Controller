@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class MsgType(Enum):
+class MsgType:
 
     #Section 1 Protocol
     A_B_INIT_HANDSHAKE = 0x01
@@ -31,6 +31,12 @@ class MsgType(Enum):
     A_B_STOP_MOTOR = 0x0D
 
     A_B_DISCONNECT_FROM_BSC = 0x0E
+
+    _reverse_mapping = {value: name for name, value in locals().items() if not name.startswith('_') and not callable(value)}
+
+    @classmethod
+    def name_from_value(cls, value):
+        return cls._reverse_mapping.get(value)
     
 class ErrType:
     pass

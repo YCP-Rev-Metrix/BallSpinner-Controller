@@ -203,13 +203,12 @@ class BallSpinnerController():
                     data = await loop.run_in_executor(None, self.commsChannel.recv, 1024)
                     #parse message
                     if not data == b'':
-                        print("Received: %s" % data.hex())  if not self.debug else None
-                        
+                        print("Received: %s" % data.hex())  if self.debug else None
                         #Pass the last message to the HMI
-                        message_type = MsgType(data[0])
-                        if message_type is not None:
-                            self.shared_data["message_type"] = message_type.name
-
+                        # message_type = MsgType(data[0])
+                        # if message_type is not None:
+                        self.shared_data["message_type"] = MsgType.name_from_value(data[0])
+                        
                         match data[0]: 
                             #shared_data["message_type"] =
                             #shared_data["message_type"] = message_enum.name
@@ -274,6 +273,7 @@ class BallSpinnerController():
                                 #Check if connection was successful
                                 if self.smartDot.connect(smartDotMACStr):   
                                     bytesData = bytearray([0x08, 0x00, 0x08]) #send B_A_RECEIVE_CONFIG_INFO
+                                    print("sending bytesData")
                                     #bytesData.extend(data[3:9]) 
                                     #determine rate and ranges
                                     bytesData.extend(bitMappings.sendConfigSettings(self.smartDot.XL_availSampleRate, self.smartDot.XL_availRange,

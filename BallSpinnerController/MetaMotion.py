@@ -24,7 +24,7 @@ class MetaMotion(iSmartDot):
     MG_availSampleRate = [2, 4, 6, 8, 10, 15, 20, 25, 30]
     MG_availRange      = [2500]
 
-    LT_availSampleRate = [.0005, .001, .01, .02, .002]
+    LT_availSampleRate = [.5, 1, 2, 5, 10, 20]
     LT_availRange = [600, 1300, 8000, 16000, 32000, 64000]
     
     def UUID(self) -> str:
@@ -254,8 +254,8 @@ class MetaMotion(iSmartDot):
         
     def startLight(self):
         libmetawear.mbl_mw_als_ltr329_set_gain(self.device.board, AlsLtr329Gain._96X)
-        libmetawear.mbl_mw_als_ltr329_set_integration_time(self.device.board, AlsLtr329IntegrationTime._400ms)
-        libmetawear.mbl_mw_als_ltr329_set_measurement_rate(self.device.board, AlsLtr329MeasurementRate._1000ms)
+        libmetawear.mbl_mw_als_ltr329_set_integration_time(self.device.board, self.LT_IntRate)
+        libmetawear.mbl_mw_als_ltr329_set_measurement_rate(self.device.board, self.LT_SampleRate)
         libmetawear.mbl_mw_als_ltr329_write_config(self.device.board)
 
         self.lightSig = libmetawear.mbl_mw_als_ltr329_get_illuminance_data_signal(self.device.board)
@@ -294,10 +294,32 @@ class MetaMotion(iSmartDot):
 
     def setSampleRates(self, XL=None, GY=None, MG=None, LT=None):
         if XL != None: 
+            #Setting the Sample Rate is done in the API based on
+            #Set Sample Rate
             self.XL_SampleRate = XL
         
         if GY != None: 
-            self.GY_SampleRate = GY
+            #Create Mapping of Enums to Sample Rates
+
+            #List of Valid Data as depicted from Metawear API
+            GYDataRates = {
+                    GyroBoschOdr._25Hz   :   25,
+                    GyroBoschOdr._50Hz   :   50, 
+                    GyroBoschOdr._100Hz  :  100,
+                    GyroBoschOdr._200Hz  :  200,
+                    GyroBoschOdr._400Hz  :  400,
+                    GyroBoschOdr._800Hz  :  800,
+                    GyroBoschOdr._1600Hz : 1600,
+                    GyroBoschOdr._3200Hz : 3200
+            }
+            #Calculate Closest sample rate of what was entered vs. what is possible to set
+            dataRate = min(GYDataRates, key=lambda k: abs(GYDataRates[k] - MG))
+
+            print("Gyroscope Set To %sHz " % GYDataRates[dataRate])
+            
+            #Choose Enum associated with set value
+            magDataRates = tuple(GYDataRates.keys())
+            self.GY_SampleRate = GYDataRates[dataRate]
         
         if MG != None: 
             #Create Mapping of Enums to Sample Rates
@@ -322,4 +344,35 @@ class MetaMotion(iSmartDot):
             magDataRates = tuple(magDataRates.keys())
             self.MG_SampleRate = magDataRates[dataRate]
 
-        if LT != None: self.LT_SampleRate = LT
+        if LT != None: 
+
+            #List of Valid Data as depicted from Metawear API
+            LTDataRates = {
+                    AlsLtr329MeasurementRate._2000ms : .5,
+                    AlsLtr329MeasurementRate._1000ms :  1, 
+                    AlsLtr329MeasurementRate._500ms  :  2,
+                    AlsLtr329MeasurementRate._200ms  :  5,
+                    AlsLtr329MeasurementRate._100ms  : 10,
+                    AlsLtr329MeasurementRate._50ms   : 20 
+            }
+
+            #List of Measurement Times associated with each Sample Rate as depicted from Metawear API
+            #Integration Time < Sample Rate
+            LTIntegrationTime = [
+                AlsLtr329IntegrationTime._400ms,
+                AlsLtr329IntegrationTime._400ms,
+                AlsLtr329IntegrationTime._400ms,
+                AlsLtr329IntegrationTime._150ms,
+                AlsLtr329IntegrationTime._100ms,
+                AlsLtr329IntegrationTime._50ms
+            ] 
+
+            #Calculate Closest sample rate of what was entered vs. what is possible to set
+            dataRate = min(LTDataRates, key=lambda k: abs(LTDataRates[k] - MG))
+
+            print("Magnetometer Set To %sHz " % LTDataRates[dataRate])
+            
+            #Choose Enum associated with set value
+            LTDataRates = tuple(LTDataRates.keys())
+            self.LT_SampleRate = LTDataRates[dataRate]
+            self.LT_IntRate = LTIntegrationTime[dataRate]

@@ -100,15 +100,16 @@ class bitMappings():
             if x ==    2500:  configSettingsBytes[5] |= 1
 
         for x in LT_availSampleRate:
-            if x ==    .0005:  configSettingsBytes[6] |= 1
-            if x ==    .001:  configSettingsBytes[6] |= 2
-            if x ==    .01:  configSettingsBytes[6] |= 4
-            if x ==   .02:  configSettingsBytes[6] |= 8
-            if x ==   .002:  configSettingsBytes[6] |= 16
+            if x ==      .5:  configSettingsBytes[6] |= 1
+            if x ==       1:  configSettingsBytes[6] |= 2
+            if x ==       2:  configSettingsBytes[6] |= 4
+            if x ==       5:  configSettingsBytes[6] |= 8
+            if x ==      10:  configSettingsBytes[6] |= 16
+            if x ==      20:  configSettingsBytes[6] |= 32
 
             
         for x in LT_availRange:
-            if x ==    600:  configSettingsBytes[7] |= 1
+            if x ==    600:   configSettingsBytes[7] |= 1
             if x ==    1300:  configSettingsBytes[7] |= 2
             if x ==    8000:  configSettingsBytes[7] |= 4
             if x ==   16000:  configSettingsBytes[7] |= 8

@@ -2,7 +2,7 @@ from BallSpinnerController import *
 import unittest
 import struct
 import asyncio
-from mbientlab.metawear import MetaWear, libmetawear, parse_value,  formatTime
+from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
 from mbientlab.warble import * 
 from datetime import datetime
@@ -18,15 +18,33 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
         self.device = self.smartDot.device
         self.testCallback = FnVoid_VoidP_DataP(self._testHandler) #sets up Data Handler
 
-        #configure Magnetometer
-        libmetawear.mbl_mw_mag_bmm150_set_preset(self.device.board, 5)
+    def _configMag(self, dataRate):
+        libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
+        #List of Valid Data 
+        magDataRates = {MagBmm150Odr._10Hz : 10,
+                        MagBmm150Odr._2Hz  :  2, 
+                        MagBmm150Odr._6Hz  :  6,
+                        MagBmm150Odr._8Hz  :  8,
+                        MagBmm150Odr._15Hz : 15,
+                        MagBmm150Odr._20Hz : 20,
+                        MagBmm150Odr._25Hz : 25,
+                        MagBmm150Odr._30Hz : 30}
+        
+        dataRate = min(magDataRates, key=lambda k: abs(magDataRates[k] - dataRate))
+        print(dataRate)
+        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, dataRate)
+       
         self.smartDot.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.smartDot.magSignal, None, self.testCallback)
 
         libmetawear.mbl_mw_mag_bmm150_enable_b_field_sampling(self.device.board)
+        libmetawear.mbl_mw_mag_bmm150_start(self.device.board)
         self.smartDot.startMagTime = datetime.now().timestamp()
         self.prevTime = datetime.now().timestamp()
+        self.smartDot.MagSampleCount = 0 
+        self.receivedSampleCount = 0
         
+
     def _testHandler(self, ctx, data):    
         #Create fake data handler to pass into magSignal        
 
@@ -34,10 +52,8 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
             try:
                 self.currTime  = float(struct.unpack('<f', mess[3:7])[0]) 
                 print(1/(self.currTime - self.prevTime))
-                print(data.contents.epoch)
                 self.prevTime = self.currTime
                 pasedData = parse_value(data)
-                print(pasedData.timestamp)
                 #Can't find any other way to call code from BSC so its copied pasted below:
                 bytesData = bytearray([0x0A, 0x00, 0x13, 0x54])
                 bytesData.extend(mess)
@@ -69,10 +85,7 @@ class MetaMotion_Mag_Tests(unittest.TestCase):
     
     def testDataParsing(self):    
         print("Running Mag Parsing Tests For 10s")
-        
-        libmetawear.mbl_mw_mag_bmm150_start(self.device.board)
-        self.smartDot.MagSampleCount = 0 
-        self.receivedSampleCount = 0
+        self._configMag(30)
         asyncio.run(asyncio.sleep(10))
         self.smartDot.stopMag()
         

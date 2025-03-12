@@ -14,6 +14,18 @@ from .iSmartDot import iSmartDot
 
 class MetaMotion(iSmartDot):
 
+    XL_availSampleRate = [12.5, 25, 50, 100, 200, 400, 800]
+    XL_availRange = [2,4,8,16]
+
+    GY_availSampleRate = [25, 50, 100, 200, 400, 800, 1600]
+    GY_availRange = [125,250,500,1000,2000]
+
+    
+    MG_availSampleRate = [2, 4, 6, 8, 10, 15, 20, 25, 30]
+    MG_availRange      = [2500]
+
+    LT_availSampleRate = [.0005, .001, .01, .02, .002]
+    LT_availRange = [600, 1300, 8000, 16000, 32000, 64000]
     
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75a"
@@ -22,46 +34,61 @@ class MetaMotion(iSmartDot):
         self.commsChannel = commChannel
         if autoConnect:
             self.connect(MAC_Address)
-        
-    def setDataSignals(self, accelDataSig, gyroDataSig, magDataSig):
-        self.accelDataSig =  accelDataSig
-        self.gyroDataSig = gyroDataSig
-        self.magDataSig = magDataSig
-        print(self.accelDataSig)
-        print(self.gyroDataSig)
-        print(self.magDataSig)
-        sleep(3)  
     
-    def setCommsPort(self, connection):
+    def setCommsPort(self, connection): #Check if we need
         self.commsChannel = connection
 
     def connect(self, MAC_Address) -> bool:
-        print("Attempting to connect to device")
-        print(MAC_Address)
-        try:
+        #print("Attempting to connect to device")
+        #print(MAC_Address)
+        #try:
             self.device = MetaWear(MAC_Address)
             self.device.connect()
             #set connection parameters 7.5ms connection interval, 0 Slave interval, 6s timeout
             libmetawear.mbl_mw_settings_set_connection_parameters(self.device.board, 7.5, 7.5, 0, 6000)
             
+            #setup event loops
             self.accelCallback = FnVoid_VoidP_DataP(self.accelDataHandler)
             self.magCallback = FnVoid_VoidP_DataP(self.magDataHandler)
             self.gyroCallback = FnVoid_VoidP_DataP(self.gyroDataHandler)
+            self.lightCallback = FnVoid_VoidP_DataP(self.lightDataHandler)
 
+            #set configurabe settings for each sensor's Rate and Range
+            self.XL_availSampleRate = MetaMotion.XL_availSampleRate
+            self.XL_availRange = MetaMotion.XL_availRange
+            self.GY_availSampleRate = MetaMotion.GY_availSampleRate
+            self.GY_availRange = MetaMotion.GY_availRange
+            self.MG_availSampleRate = MetaMotion.MG_availSampleRate
+            self.MG_availRange = MetaMotion.MG_availRange
+            self.LT_availRange = MetaMotion.LT_availRange
+            self.LT_availSampleRate = MetaMotion.LT_availSampleRate
+
+            #set default Sample Rates and Ranges
+            self.setSampleRates(XL=100, GY=100, MG=10)
+            #self.setSampleRanges(XL=100, GY=100, MG=10)
+
+            self.XL_Range = 2
+            self.GY_Range = 2
+            
+            self.MG_SampleRate = 10
+        
             print("Connected to device")
             return True
-
-        #Timeout occured and Connection was unsuccessful     
-        except:
-            print("Unable to connect to device")
-            return False
     
     def accelDataHandler(self, ctx, data): 
-        self.AccelSampleCount += 1   
+        #Parse data into Cartesian Values
         parsedData = parse_value(data)
-        timeStamp = datetime.now().timestamp() - self.startAccelTime
+
+        # Set the Timestamps from the First Received Sample
+        if self.AccelSampleCount == 0:
+            self.prevAccelEpoch = data.contents.epoch
+        timeStamp = (data.contents.epoch - self.prevAccelEpoch)/1000 #Epoch is given in ms
         
+        #Pack Sample Count into 3 Byte Big Endian Int
+        self.AccelSampleCount += 1
         sampleCountInBytes = struct.pack('>I',self.AccelSampleCount )[1:4]
+        
+        # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
         yValInBytes : bytearray = struct.pack('<f', parsedData.y)
@@ -69,68 +96,99 @@ class MetaMotion(iSmartDot):
         
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
 
-        try: ## Check if TCP connection is set up, if not, just print in terminal
+        try: # Check if TCP connection is set up, if not, just print xyz values in terminal
             self.accelDataSig(mess)
-            print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
-        except:    
+        except Exception as e:
             print(parsedData)
+            print(e)
+
 
     def magDataHandler(self, ctx, data):
+        #Parse data into Cartesian Values
         parsedData = parse_value(data)
-        timeStamp = datetime.now().timestamp() - self.startMagTime
+
+        # Set the Timestamps from the First Received Sample
+        if self.MagSampleCount == 0:
+            self.prevMagEpoch = data.contents.epoch
+
+        timeStamp = (data.contents.epoch - self.prevMagEpoch)/1000 #Epoch is given in ms
+
+        #Pack Sample Count into 3 Byte Big Endian Int
+        self.MagSampleCount += 1
         sampleCountInBytes = struct.pack('>I',self.MagSampleCount )[1:4]
-        self.MagSampleCount+=1
+        
+        # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
         yValInBytes : bytearray = struct.pack('<f', parsedData.y)
         zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
-        try:
+        
+        try: # Check if TCP connection is set up, if not, just print xyz values in terminal
             self.magDataSig(mess)
-            print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
         except Exception as e:
-            print(f"Unexpected error in accelDataHandler: {e}")
+            print(f"Unexpected error in MGDataHandler: {e}")
+            print(parsedData)
 
     def gyroDataHandler(self, ctx, data):
+        #Parse data into Cartesian Values
         parsedData = parse_value(data)
-        timeStamp = datetime.now().timestamp() - self.startGyroTime
+        
+        # Set the Timestamps from the First Received Sample
+        if self.GyroSampleCount == 0:
+            self.prevGyroEpoch = data.contents.epoch
 
-        sampleCountInBytes = struct.pack('>I',self.GyroSampleCount )[1:4]
+        timeStamp = (data.contents.epoch - self.prevGyroEpoch)/1000 #Epoch is given in ms
+
+        #Pack Sample Count into 3 Byte Big Endian Int
         self.GyroSampleCount+=1
+        sampleCountInBytes = struct.pack('>I',self.GyroSampleCount )[1:4]
+        
+        # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
         timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
         xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
         yValInBytes : bytearray = struct.pack('<f', parsedData.y)
         zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
         mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
-        try: ## Check if TCP connection is set up, if not, just print in terminal
+        
+        try: # Check if TCP connection is set up, if not, just print in terminal
             self.gyroDataSig(mess)
-            #print("Encoded Data " + xValInBytes + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
-
-        except BrokenPipeError:
-            raise
-
-        except Exception as e:    
-            raise
-        except:
+           # print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+        except Exception as e:
             print(parsedData)
+            print(e)
+
             
+    def lightDataHandler(self, ctx, data):
+        parsedData = parse_value(data)
+        timeStamp = datetime.now().timestamp() - self.startLightTime
+        sampleCountInBytes = struct.pack('>I',self.LightSampleCount )[1:4]
+        self.LightSampleCount+=1
 
+        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+        valInBytes : bytearray = struct.pack('<f', parsedData) 
 
-    def startMag(self,  dataRate : int, odr : None):  
+        mess = sampleCountInBytes + timeStampInBytes + valInBytes 
+        try:
+            self.lightDataSig(mess)
+            print("Encoded Data " + valInBytes.hex()+ " 0000 0000")
+        except Exception as e:
+            print(parsedData)
+            print(e)
+
+    def startMag(self):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
-        if dataRate == 10:
-            libmetawear.mbl_mw_mag_bmm150_set_preset(self.device.board, MagBmm150Preset.LOW_POWER)
-        elif dataRate == 20:
-            libmetawear.mbl_mw_mag_bmm150_set_preset(self.device.board, MagBmm150Preset.HIGH_ACCURACY)
-
+        libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, self.MG_SampleRate)
+       
         self.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.magCallback)
 
         libmetawear.mbl_mw_mag_bmm150_enable_b_field_sampling(self.device.board)
-        self.startMagTime = datetime.now().timestamp()
         libmetawear.mbl_mw_mag_bmm150_start(self.device.board)
         self.MagSampleCount = 0
 
@@ -142,12 +200,12 @@ class MetaMotion(iSmartDot):
     def disconnect(self):
         self.device.disconnect()
       
-    def startAccel(self, dataRate : int, range : int):
+    def startAccel(self):
         
         print("Configuring Accelerometer")
-        libmetawear.mbl_mw_acc_set_odr(self.device.board, dataRate)
+        libmetawear.mbl_mw_acc_set_odr(self.device.board, self.XL_SampleRate)
         print("ODR SET")        
-        libmetawear.mbl_mw_acc_set_range(self.device.board, range)  
+        libmetawear.mbl_mw_acc_set_range(self.device.board, self.XL_Range)  
         print("RANGE SET")
         libmetawear.mbl_mw_acc_write_acceleration_config(self.device.board)
 
@@ -159,7 +217,6 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_acc_enable_acceleration_sampling(self.device.board)
         
         if(self.accelSignal != None):
-            self.startAccelTime = datetime.now().timestamp()
             libmetawear.mbl_mw_acc_start(self.device.board)
         else:
             print("Unable to Start Polling Data: Acceleration Not Enabled")
@@ -171,12 +228,12 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_acc_disable_acceleration_sampling(self.device.board)
         libmetawear.mbl_mw_datasignal_unsubscribe(self.accelSignal)
     
-    def startGyro(self, dataRate : int, range : int):
+    def startGyro(self):
         # Set ODR to 100Hz
-        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, 100)
+        libmetawear.mbl_mw_gyro_bmi160_set_odr(self.device.board, self.GY_SampleRate)
 
         # Set data range to +/250 degrees per second
-        libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, range)
+        libmetawear.mbl_mw_gyro_bmi160_set_range(self.device.board, self.GY_Range)
 
         # Write the changes to the sensor
         libmetawear.mbl_mw_gyro_bmi160_write_config(self.device.board)
@@ -186,7 +243,6 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_datasignal_subscribe(self.gyroSig, None, self.gyroCallback)
         libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.device.board)
         
-        self.startGyroTime = datetime.now().timestamp()
         libmetawear.mbl_mw_gyro_bmi160_start(self.device.board)
         self.GyroSampleCount = 0
 
@@ -196,6 +252,22 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_gyro_bmi160_disable_rotation_sampling(self.device.board)
         libmetawear.mbl_mw_datasignal_unsubscribe(self.gyroSig)
         
+    def startLight(self):
+        libmetawear.mbl_mw_als_ltr329_set_gain(self.device.board, AlsLtr329Gain._96X)
+        libmetawear.mbl_mw_als_ltr329_set_integration_time(self.device.board, AlsLtr329IntegrationTime._400ms)
+        libmetawear.mbl_mw_als_ltr329_set_measurement_rate(self.device.board, AlsLtr329MeasurementRate._1000ms)
+        libmetawear.mbl_mw_als_ltr329_write_config(self.device.board)
+
+        self.lightSig = libmetawear.mbl_mw_als_ltr329_get_illuminance_data_signal(self.device.board)
+        libmetawear.mbl_mw_datasignal_subscribe(self.lightSig, None, self.lightCallback)
+        
+        self.startLightTime = datetime.now().timestamp()
+        libmetawear.mbl_mw_als_ltr329_start(self.device.board)
+        self.LightSampleCount = 0
+
+    def stopLight(self):
+        pass
+
     def turnOnRedLED(self):
         pattern = LedPattern(delay_time_ms= 5000, repeat_count= Const.LED_REPEAT_INDEFINITELY)
         libmetawear.mbl_mw_led_load_preset_pattern(byref(pattern), LedPreset.SOLID)
@@ -217,8 +289,34 @@ class MetaMotion(iSmartDot):
     def turnOffLED(self):
         libmetawear.mbl_mw_led_stop_and_clear(self.device.board)
 
-    def startLight(self):
-        pass
+    def setSampleRates(self, XL=None, GY=None, MG=None, LT=None):
+        if XL != None: 
+            self.XL_SampleRate = XL
+        
+        if GY != None: 
+            self.GY_SampleRate = GY
+        
+        if MG != None: 
+            #Create Mapping of Enums to Sample Rates
 
-    def stopLight(self):
-        pass
+            #List of Valid Data as depicted from Metawear API
+            magDataRates = {
+                    MagBmm150Odr._2Hz  :  2, 
+                    MagBmm150Odr._6Hz  :  6,
+                    MagBmm150Odr._8Hz  :  8,
+                    MagBmm150Odr._10Hz : 10,
+                    MagBmm150Odr._15Hz : 15,
+                    MagBmm150Odr._20Hz : 20,
+                    MagBmm150Odr._25Hz : 25,
+                    MagBmm150Odr._30Hz : 30}
+            
+            #Calculate Closest sample rate of what was entered vs. what is possible to set
+            dataRate = min(magDataRates, key=lambda k: abs(magDataRates[k] - MG))
+
+            print("Magnetometer Set To %sHz " % magDataRates[dataRate])
+            
+            #Choose Enum associated with set value
+            magDataRates = tuple(magDataRates.keys())
+            self.MG_SampleRate = magDataRates[dataRate]
+
+        if LT != None: self.LT_SampleRate = LT

@@ -10,8 +10,8 @@ class Motor():
         #Configure GPIO Pin
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BOARD)
+        
         GPIO.setup(GPIOPin, GPIO.OUT)
-
         #1kHz
         self.PWM = GPIO.PWM(GPIOPin, 500)
         #Declare on/off State (0 = Off; 1 = On)
@@ -28,11 +28,15 @@ class Motor():
     def turnOffMotor(self):
         if self.state:
             self.PWM.stop()
+            GPIO.cleanup(self.GPIOPin)
             self.state = False
         else:
             print("Unable to Stop Motor: Motor is Not Running")
 
-    def changeSpeed(self, dutyCycle : int):
+    def changeSpeed(self, rpm : int):
+        #Hard-Coded Max Shunt Motor rpm
+        dutyCycle = (rpm/60) * 100
+        if dutyCycle > 100: dutyCycle = 100
         print("Changing Speed %i%%" % dutyCycle)
         if self.state:
             self.PWM.ChangeDutyCycle(dutyCycle)

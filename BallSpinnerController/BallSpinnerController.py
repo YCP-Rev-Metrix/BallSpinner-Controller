@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import subprocess
 from mbientlab.warble import BleScanner
 import six
 from .MetaMotion import MetaMotion
@@ -33,11 +34,21 @@ class BSCModes(Enum):
     
 class BallSpinnerController():
 
-    def __init__(self):
-    
+    def __init__(self, debug="0", name="Ball Spinner Controller"):
+        #Before Anything, Check if user has raised permissions
+        try:
+            #Manually Raise Permissiosn, if Possible
+            subprocess.check_call(['sudo', '-n', 'true'])
+        
+        except subprocess.CalledProcessError: #If not possible to run with admin permissions, 
+            raise PermissionError("Application Must Be Ran with Raised Permissions")
+
+        self.debug = (True if debug == "1" else False)
+        
         #determine global ip address
         self.iSmartDot = None
         
+        print("Debug Mode: ON") if self.debug else None 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.connect(("8.8.8.8", 80))
@@ -74,69 +85,65 @@ class BallSpinnerController():
         self.smartDot.stopGyro()
         self.smartDot.stopAccel()
         self.smartDot.stopMag()
+        del self.PrimMotor
+        del self.secMotor1
+        del self.secMotor2
         self.commsChannel.close()
         self.commsPort.close()
     
     async def smartDotHandler(self):
         print("Handling SmartDot:")
         def accelDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x8A, 0x00, 0x13, 0x41])
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x41])
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
             except Exception as e:
                 raise self.resetCommsPort()
 
-                def brokenPipeErrorThrower():
-                    print(f"Exception caught in the event loop: {exception}")
-                # Schedule the exception-handling coroutine on the main event loop
-                asyncio.run_coroutine_threadsafe(brokenPipeErrorThrower, asyncio.get_event_loop())
-                raise BrokenPipeError
-
         def magDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x8A, 0x00, 0x13, 0x4D])
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x4D])
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
             except BrokenPipeError:
                 raise 
-                
-                def brokenPipeErrorThrower():
-                    print(f"Exception caught in the event loop: {exception}")
-                # Schedule the exception-handling coroutine on the main event loop
-                asyncio.run_coroutine_threadsafe(brokenPipeErrorThrower, asyncio.get_event_loop())
         
         def gyroDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([0x8A, 0x00, 0x13, 0x47])
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x47])
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
             except Exception as e:
                 self.resetCommsPort()
                 raise BrokenPipeError
-                
 
-                def brokenPipeErrorThrower():
-                    print(f"Exception caught in the event loop: {exception}")
-                # Schedule the exception-handling coroutine on the main event loop
-                asyncio.run_coroutine_threadsafe(brokenPipeErrorThrower, asyncio.get_event_loop())
+        def lightDataSignal(dataBytes : bytearray):
+            bytesData = bytearray([0x0A, 0x00, 0x13, 0x4C])
+            bytesData.extend(dataBytes)
+            #Add 0's to "Y and Z values"
+            bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+            try:
+                self.commsChannel.sendall(bytesData)
+            except Exception as e:
+                self.resetCommsPort()
                 raise BrokenPipeError
-
-        self.smartDot.setDataSignals(accelDataSig= accelDataSignal, magDataSig= magDataSignal, gyroDataSig=gyroDataSignal)
+            
+        self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
         #Instantly Setting the Start Configs for the 9DOF's to skip implementation
 
         self.smartDot.startMag(10, 10)
         self.smartDot.startAccel(100, 10)
-        self.smartDot.startGyro(100, 10)       
+        self.smartDot.startGyro(100, 10) 
+        self.smartDot.startLight(100, 10)      
         
         await self.wait_for_completion()
         print("Handler Done")
 
     async def wait_for_completion(self):
-        await asyncio.sleep(9999)  # Or replace this with a condition/event loop
+        await asyncio.sleep(9999)  
 
     async def commsHandler(self):
-            print("Comms Handler entered")
             loop = asyncio.get_event_loop()
             while True:
             #Read first message com
@@ -144,11 +151,11 @@ class BallSpinnerController():
                     data = await loop.run_in_executor(None, self.commsChannel.recv, 1024)
                     #parse message
                     if not data == b'':
-                        print(data)
+                        print("Received: %s" % data.hex())  if not self.debug else None
                         match data[0]: 
-                            case(0x81): #APP_INIT Message
-                                #Message Received: | Mess Type: 0x81 | Mess Size: 0x0001 | RandomByte: XXXX 
-                                print("Message Type: App Sending Start Message")
+                            case(0x01): #APP_INIT Message
+                                #Message Received: | Msg Type: 0x01 | Msg Size: 0x0001 | RandomByte: XXXX 
+                                print("Received: APP_INIT Message") if self.debug else None
                                 if self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION:
                                     #Send Error: Already Connected to Application
 
@@ -156,34 +163,32 @@ class BallSpinnerController():
                                     pass
                                 else:
                                     # Confirm Communications are established and send confirmation signal
-                                    #| Mess Type: 0x82 | Mess Size: 0x0001 | RandomByte: XXXX 
+                                    #| Msg Type: 0x02 | Msg Size: 0x0001 | RandomByte: XXXX 
                                     
+                                    print("Sending: APP_INIT_ACK Message") if self.debug else None
                                     #Grab Random Byte from third and resend
-                                    bytesData = bytearray([0x82, 0x00, 0x01, data[3]]) 
-                                    #bytesData.append(data[2])
-                                    #print(bytes(bytesData))
+                                    bytesData = bytearray([0x02, 0x00, 0x01, data[3]]) 
                                     self.commsChannel.send(bytesData)
                                     self.mode = BSCModes.IDLE
 
-                            case(0x83): #BSC_NAME_REQ Message
+                            case(0x03): #BSC_NAME_REQ Message
                                 print("Looking For Pi")
                                 name : str = "Ball Spinner Controller"
-                                bytesData =bytearray([0x84, 0x00, name.__len__()])
+                                bytesData =bytearray([0x04, 0x00, name.__len__()])
                                 bytesData.extend(name.encode("utf-8"))
                                 print(bytes(bytesData))
                                 self.commsChannel.send(bytesData)
                                 self.mode = BSCModes.IDLE
                                 pass
                             
-                            case(0x85): #BSC_NAME Message
-                                print(data[3:9].hex())
+                            case(0x05): #SMARTDOT_SCAN Message
                                 #If the 
                                 if data[3:9].hex() == "000000000000":
-                                    print("TRUEEEEE")
+                                    print("Received: SMARTDOT_SCAN_INIT") if self.debug else None
+
                                     self.mode = BSCModes.BLUETOOTH_SCANNING
-                                    self.scanner = asyncio.create_task(self.tCPscanAll(0))
-                                    print("Connecting to \"SmartDot\"")
-                                #Keep Trying to connect to Module in Presentation Ball
+                                    self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
+
                                 else:
                                     self.scanner.cancel()
                                     self.smartDot : iSmartDot = None
@@ -203,18 +208,19 @@ class BallSpinnerController():
                                         print("Womp Womp") 
                                         self.smartDot = MetaMotion()
                                     print("Connecting to "+ smartDotMACStr)
-                                    print(smartDotMACStr)
-                                    if not self.smartDot.connect(smartDotMACStr):   
+                                    if self.smartDot.connect(smartDotMACStr):   
+                                        bytesData = bytearray([0x06, 0x00, 0x06])
+                                        bytesData.extend(data[3:9]) 
+                                        print("Sending: 0x%s" % bytes(bytesData).hex())
+                                        self.commsChannel.send(bytesData)
+                                        self.mode = BSCModes.READY_FOR_INSTRUCTIONS
+                                    else:
                                         self.smartDot = None
-                                    
-                                    #NEED TO CHECK IF NOT TRUE, SEND ERROR
-                                    bytesData = bytearray([0x86, 0x00, 0x06])
-                                    bytesData.extend(data[4:9]) 
-                                    print(bytes(bytesData))
-                                    self.commsChannel.send(bytesData)
-                                    self.mode = BSCModes.READY_FOR_INSTRUCTIONS
-    
-                            case(0x88): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
+                                        #NEED TO CHECK IF NOT TRUE, SEND ERROR
+
+                                        
+
+                            case(0x08): #ABBREVIATED_MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 
                                     print("Initializing Sensors")
@@ -238,7 +244,7 @@ class BallSpinnerController():
                                 self.secMotor1.changeSpeed(int(data[4]/12*100)) 
                                 self.secMotor2.changeSpeed(int(data[5]/12*100))
 
-                            case(0x8B): #STOP_MOTOR_INSTRUCTIONS
+                            case(0x0B): #STOP_MOTOR_INSTRUCTIONS
                                 if self.mode == BSCModes.TAKING_SHOT_DATA:
                                     #Stop Motors
 
@@ -250,6 +256,7 @@ class BallSpinnerController():
                                     self.smartDot.stopAccel()
                                     self.smartDot.stopGyro()
                                     self.smartDot.stopMag()
+                                    
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
                     sys.exit(1)
@@ -274,7 +281,6 @@ class BallSpinnerController():
                     self.availDevicesType[result.mac] = smartDotClass
 
         if(debugMode):
-            print("Software Added")
             self.availDevices["11:11:11:11:11:11"] = "smartDotSimulator" 
             self.availDevicesType["11:11:11:11:11:11"] = SmartDotEmulator
 
@@ -290,15 +296,21 @@ class BallSpinnerController():
                 #print all BLE devices found and append to connectable list                
                 count = 0
                 for address, name in six.iteritems(self.availDevices):
+                    name : str
                     address = address.replace(":", "")
-                    bytesData = bytearray([0x86, 0x00, 0x06, 
+
+                    #Pack Message So Lenght fits in 2 bytes
+                    messLen = struct.pack(">I", (6 + name.__len__()))[2:4]
+                    bytesData = bytearray([0x06])
+                    bytesData.extend(messLen) 
+                    bytesData.extend(bytearray([                    
                                         int(address[0:2],16),
                                         int(address[2:4],16),
                                         int(address[4:6],16),
                                         int(address[6:8],16),
                                         int(address[8:10],16),
-                                        int(address[10:12],16)])
-                    name : str
+                                        int(address[10:12],16)]))
+                                        
                     bytesData.extend(name.encode("utf-8"))
                     print(self.commsChannel.send(bytesData))
                     

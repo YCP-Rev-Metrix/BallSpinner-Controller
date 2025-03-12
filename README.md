@@ -1,19 +1,21 @@
 # Ball-Spinner
 Pre-Requesites
-32-bit Architecture
-1. Install Metawear API
-        a)Create and Open Virtual Environment
-                    ```
-            sudo python -m venv /*locationToVenV*/
-            source /*LocationToVenV*/bin/activate
-            (However, sudo pip install metawear --break-system-packages is the only command that allowed metawear to work properly)
-            ```
+Raspbarrian 32 OS 
 
-        b)Install Dev Tools - needed to run application
+1. Install Metawear API
+        a)Install Dev Tools - needed to run application
             ```
             sudo apt-get install libboost-all-dev 
             sudo apt-get install libbluetooth-dev
             ```
+
+        b) Metawear API
+            The Metawear API only works with 32-bit architectures (hence, the 32-bit OS)
+            ```
+            sudo pip install metawear --break-system-packages 
+            ```
+            is the only command that allowed metawear to work properly
+
 
 2. Confirm Download of other essenstial libraries
 

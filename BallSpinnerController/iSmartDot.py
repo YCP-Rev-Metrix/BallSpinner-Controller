@@ -17,10 +17,11 @@ class iSmartDot(metaclass=ABCMeta):
     def disconnect(MAC_Address):
         pass
     
-    def setDataSignals(self, accelDataSig, gyroDataSig, magDataSig):
+    def setDataSignals(self, accelDataSig, gyroDataSig, magDataSig, lightDataSig):
         self.accelDataSig =  accelDataSig
         self.gyroDataSig = gyroDataSig
         self.magDataSig = magDataSig
+        self.lightDataSig = lightDataSig
 
     @abstractmethod
     def startMag(self,  dataRate : int, odr : None):   
@@ -45,6 +46,14 @@ class iSmartDot(metaclass=ABCMeta):
     @abstractmethod
     def stopGyro(self):
         pass
+    
+    @abstractmethod
+    def startLight(self,  dataRate : int, odr : None):
+        pass
+
+    @abstractmethod
+    def stopLight(self):
+        pass 
     
     @abstractmethod
     def UUID(self) -> str: ...

@@ -124,7 +124,7 @@ class BallSpinnerController():
         self.smartDot.stopGyro()
         self.smartDot.stopAccel()
         self.smartDot.stopMag()
-        del self.PrimMotor
+        if hasattr(self, 'PrimMotor'): del self.PrimMotor
         del self.secMotor1
         del self.secMotor2
         self.commsChannel.close()
@@ -138,8 +138,8 @@ class BallSpinnerController():
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
-            except Exception as e:
-                raise self.resetCommsPort()
+            except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
+                self.smartDot.stopAccel()
 
         def magDataSignal(dataBytes : bytearray):
             bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
@@ -147,8 +147,8 @@ class BallSpinnerController():
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
-            except BrokenPipeError:
-                raise self.resetCommsPort()
+            except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
+                self.smartDot.stopMag()
         
         def gyroDataSignal(dataBytes : bytearray):
             bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
@@ -156,9 +156,8 @@ class BallSpinnerController():
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
-            except Exception as e:
-                self.resetCommsPort()
-                raise BrokenPipeError
+            except Exception: # Assumed Exception is caused from broken pipe, can look into another time
+               self.smartDot.stopGyro()
 
         def lightDataSignal(dataBytes : bytearray):
             bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
@@ -168,11 +167,8 @@ class BallSpinnerController():
             bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
             try:
                 self.commsChannel.sendall(bytesData)
-                print(bytesData)
-            except Exception as e:
-                print(e)
-                self.resetCommsPort()
-                raise BrokenPipeError
+            except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                self.smartDot.stopLight()
             
         self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
         #Instantly Setting the Start Configs for the 9DOF's to skip implementation
@@ -287,14 +283,26 @@ class BallSpinnerController():
                                     #NEED TO CHECK IF NOT TRUE, SEND ERROR
                             
                             case(MsgType.A_B_RECEIVE_CONFIG_INFO): #A_B_RECEIVE_CONFIG_INFO
-                                print(data)
+                                print(data.hex())
                                 XLConfigSampleRate = data[3] >> 4 # Parse XL Bytes
-
+                                GYConfigSampleRate = data[4] >> 4 # Parse GY Bytes
+                                MGConfigSampleRate = data[5] >> 4 # Parse MG Bytes
+                                LTConfigSampleRate = data[6] >> 4 # Parse LT Bytes
+                                
+                                print(GYConfigSampleRate)
                                 #create List of XL Rates to set
                                 XLSampleRates = [12.5, 25, 50, 100, 200, 400, 800, 1600] 
+                                GYSampleRates = [25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
+                                MGSampleRates = [2, 6, 8, 10, 15, 20, 25, 30]
+                                LTSampleRates = [.5, 1, 2, 5, 10, 20]
 
-                                XLConfigSampleRate = XLSampleRates[XLConfigSampleRate]
-                                print("Setting XL Rate to %i" % XLConfigSampleRate)    
+                                self.smartDot.setSampleRates(XL = XLSampleRates[XLConfigSampleRate],
+                                                             GY = GYSampleRates[GYConfigSampleRate],
+                                                             MG = MGSampleRates[MGConfigSampleRate],
+                                                             LT = XLSampleRates[LTConfigSampleRate])
+                                
+                                 
+                                print("Setting XL Rate to %i" % GYConfigSampleRate)    
 
                             case(MsgType.A_B_MOTOR_INSTRUCTIONS): #MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
@@ -424,7 +432,7 @@ class BallSpinnerController():
         except asyncio.CancelledError: #Called when BLE Thread is stopped
             pass
 
-        except BrokenPipeError:
+        except BrokenPipeError: #If Comms Crash while Scanning
             pass
 
         finally:

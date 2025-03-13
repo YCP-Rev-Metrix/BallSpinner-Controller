@@ -297,7 +297,8 @@ class MetaMotion(iSmartDot):
             #Setting the Sample Rate is done in the API based on
             #Set Sample Rate
             self.XL_SampleRate = XL
-        
+            print("Accelerometer Set To %sHz " % self.XL_SampleRate)
+
         if GY != None: 
             #Create Mapping of Enums to Sample Rates
 
@@ -313,7 +314,7 @@ class MetaMotion(iSmartDot):
                     GyroBoschOdr._3200Hz : 3200
             }
             #Calculate Closest sample rate of what was entered vs. what is possible to set
-            dataRate = min(GYDataRates, key=lambda k: abs(GYDataRates[k] - MG))
+            dataRate = min(GYDataRates, key=lambda k: abs(GYDataRates[k] - GY))
 
             print("Gyroscope Set To %sHz " % GYDataRates[dataRate])
             
@@ -368,9 +369,9 @@ class MetaMotion(iSmartDot):
             ] 
 
             #Calculate Closest sample rate of what was entered vs. what is possible to set
-            dataRate = min(LTDataRates, key=lambda k: abs(LTDataRates[k] - MG))
+            dataRate = min(LTDataRates, key=lambda k: abs(LTDataRates[k] - LT))
 
-            print("Magnetometer Set To %sHz " % LTDataRates[dataRate])
+            print("Light Set To %sHz " % LTDataRates[dataRate])
             
             #Choose Enum associated with set value
             LTDataRates = tuple(LTDataRates.keys())

@@ -64,7 +64,7 @@ class MetaMotion(iSmartDot):
             self.LT_availSampleRate = MetaMotion.LT_availSampleRate
 
             #set default Sample Rates and Ranges
-            self.setSampleRates(XL=100, GY=100, MG=10)
+            self.setSampleRates(XL=100, GY=100, MG=10, LT=.5)
             #self.setSampleRanges(XL=100, GY=100, MG=10)
 
             self.XL_Range = 2
@@ -176,7 +176,6 @@ class MetaMotion(iSmartDot):
         mess = sampleCountInBytes + timeStampInBytes + valInBytes 
         try:
             self.lightDataSig(mess)
-            print("Encoded Data " + valInBytes.hex()+ " 0000 0000")
         except Exception as e:
             print(parsedData)
             print(e)

@@ -104,10 +104,8 @@ class BallSpinnerController():
             try:
                 asyncio.run(self.commsHandler()) 
 
-            except OSError: #Raised if Comms is forcibly closed by resetCommsPort while waiting for message
+            except OSError: #Raised if Comms is forcibly closed while waiting for message
                 print("Socket Closed, must restart")   
-                self.commsChannel.shutdown(socket.SHUT_RDWR)
-                self.commsPort.shutdown(socket.SHUT_RDWR)
                 self.commsChannel.close()
                 self.commsPort.close()
             except KeyboardInterrupt:
@@ -119,16 +117,6 @@ class BallSpinnerController():
             except BrokenPipeError:
                 print("Socket Closed Ubruptly, must restart")
                 pass
-
-    def resetCommsPort(self):
-        self.smartDot.stopGyro()
-        self.smartDot.stopAccel()
-        self.smartDot.stopMag()
-        if hasattr(self, 'PrimMotor'): del self.PrimMotor
-        del self.secMotor1
-        del self.secMotor2
-        self.commsChannel.close()
-        self.commsPort.close()
     
     async def smartDotHandler(self):
         print("Handling SmartDot:")
@@ -168,6 +156,7 @@ class BallSpinnerController():
             try:
                 self.commsChannel.sendall(bytesData)
             except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                print(f"Error Occured Somewhere in BSC: {e}")
                 self.smartDot.stopLight()
             
         self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
@@ -289,7 +278,7 @@ class BallSpinnerController():
                                 MGConfigSampleRate = data[5] >> 4 # Parse MG Bytes
                                 LTConfigSampleRate = data[6] >> 4 # Parse LT Bytes
                                 
-                                print(GYConfigSampleRate)
+                                print(LTConfigSampleRate)
                                 #create List of XL Rates to set
                                 XLSampleRates = [12.5, 25, 50, 100, 200, 400, 800, 1600] 
                                 GYSampleRates = [25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
@@ -299,11 +288,8 @@ class BallSpinnerController():
                                 self.smartDot.setSampleRates(XL = XLSampleRates[XLConfigSampleRate],
                                                              GY = GYSampleRates[GYConfigSampleRate],
                                                              MG = MGSampleRates[MGConfigSampleRate],
-                                                             LT = XLSampleRates[LTConfigSampleRate])
+                                                             LT = LTSampleRates[LTConfigSampleRate])
                                 
-                                 
-                                print("Setting XL Rate to %i" % GYConfigSampleRate)    
-
                             case(MsgType.A_B_MOTOR_INSTRUCTIONS): #MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 

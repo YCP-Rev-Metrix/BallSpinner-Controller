@@ -8,10 +8,23 @@ import struct
 
 class SmartDotEmulator(iSmartDot):
     #Value in Str because all MAC Adress checks use strings (Currently)
+    XL_availSampleRate = [12.5, 25, 50, 100, 200, 400, 800, 1600, 3200]
+    XL_availRange = []
+
+    GY_availSampleRate = []
+    GY_availRange = []
+
+    
+    MG_availSampleRate = []
+    MG_availRange = []
+
+    LT_availRange = []
 
     def __init__(self):
+        global XL_availSampleRate
         # Start the task with the current event loop
         self._MAC_ADDRESS = "11:11:11:11:11:11"
+        self.XL_availSampleRate = SmartDotEmulator.XL_availSampleRate
 
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75b"
@@ -27,7 +40,8 @@ class SmartDotEmulator(iSmartDot):
         try:
             csvFile = open('data/SmartDotEmulatorData.csv', 'r') 
             self.smartDotData = csvFile.readlines()
-        except:
+        except Exception as e:
+            print(e)
             return False
         
         finally: 

@@ -1,11 +1,14 @@
 from BallSpinnerController.iSmartDot import iSmartDot
 from BallSpinnerController.MetaMotion import MetaMotion
 from BallSpinnerController.SmartDotEmulator import SmartDotEmulator
-from BallSpinnerController.Motor import Motor
+#from BallSpinnerController.Motor import Motor
+from BallSpinnerController.iMotor import iMotor
+from BallSpinnerController.StepperMotor import StepperMotor as Motor
 from mbientlab.warble import BleScanner
 import six
 import time
 import asyncio
+import socket
 
 class CLI:
     async def scanAll(self) -> dict:
@@ -26,9 +29,10 @@ class CLI:
         #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
         def handler(result):
             for listedConnect in range(len(self.smartDot)):
-                #if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
-                    print("Device Found")
+                if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
                     self.availDevices[result.mac] = result.name
+                    if(isinstance(self.smartDot[listedConnect],MetaMotion)):
+                            self.availDevicesType[result.mac] = MetaMotion
 
         BleScanner.set_handler(handler)
         BleScanner.start()
@@ -101,41 +105,34 @@ class CLI:
                 
             elif consInput == "5":
                 print("Select Rate")
-                odr = input()
+                smartDot.setSampleRates(XL=int(input()))
                 print("Select Range")
-                range = input()
+                smartDot.setRanges(XL=int(input()))
                 print("Poll for How long?")
                 timeForAccel = input()
-                smartDot.startAccel(int(odr), int(range))
+                smartDot.startAccel()
                 time.sleep(int(timeForAccel))
                 smartDot.stopAccel()
 
             elif consInput == "6":
                 print("Select Rate")
-                odr = input()
+                smartDot.setSampleRates(GY=int(input()))
                 print("Select Range")
-                range = input()
+                smartDot.setRanges(GY=int(input()))
                 print("Poll for How long?")
                 timeForGyro = input()
-                smartDot.startGyro(int(odr), int(range))
+                smartDot.startGyro()
                 time.sleep(int(timeForGyro))
                 smartDot.stopGyro()
 
             elif consInput == "7":
                 print("Select Rate")
-                print("[1] 10 Hz")
-                print("[2] 20 Hz")
-
-                dataRate = input()
+                smartDot.setSampleRates(MG=int(input()))
+                print("Select Range")
+                smartDot.setRanges(MG=int(input()))
                 print("Poll for How long?")
                 timeForMag = input()
-                if dataRate == "1":
-                    smartDot.startMag(10, None)
-                elif dataRate == "2":
-                    smartDot.startMag(20, None)
-                else:
-                    print("Too bad, polling at 10Hz")
-                    smartDot.startMag(10, None)
+                smartDot.startMag()
 
                 time.sleep(int(timeForMag))
                 smartDot.stopMag()
@@ -190,19 +187,115 @@ class CLI:
 
             
             elif motors.__getitem__(int(motorNum)).state:
-                print("What are you changing the Duty Cycle?")
+                print("What is the RPM?")
                 consInput = input()
                 motors[int(motorNum)].changeSpeed(int(consInput))
+
+    async def tcpCLI(self):
+        #Start Up TCP Socket
+        consInput = ''
+        ipAddr = ''
+        print("Starting Up Connection to Application, press ^C to stop")
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                s.connect(("8.8.8.8", 80))
+                ipAddr = s.getsockname()[0]
+            commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_address = (ipAddr, 8411)  
+            print('Server listening on {}:{}'.format(*server_address))
+            commsPort.bind(server_address)
+
+            #wait for a device to attempt TCP connection to Port
+            commsPort.listen(1)
+            commsChannel, clientIp  = commsPort.accept()
+            commsChannel.setblocking(True)
+        except KeyboardInterrupt:
+            print("\nUser Stopped While Listening, Exiting")
+            commsPort.close()
+            raise KeyboardInterrupt
+        except OSError as e:
+            if e.errno == 98:
+                print("Port was not de-allocated properly, Exiting")
+                raise KeyboardInterrupt
+        except Exception as e:
+            print(e)
+            print("Unable to connect to the internet to obtain a Global Ip address, please try again later")
+            consInput = 'E'
+        print("Connection Established, verifying application")
+        
+        #Grab Random Byte from third and resend
+        data = commsChannel.recv(1024)
+        bytesData = bytearray([0x02, 0x00, 0x01, data[3]]) 
+        commsChannel.send(bytesData)
+        print("Software Connected")
+        async def tcpListener(): #Continuosly Print received messages, even when sending
+            print("Listening To Socket")
+            run = True
+            while run == True:
+                try:
+                    data = await asyncio.get_event_loop().run_in_executor(None, commsChannel.recv, 1024)
+                    print(f"Received {data}")
+                except Exception: #If commsChannel is closed, end loop
+                    run = False
+
+        #Start up tcpListener()        
+        listening = asyncio.create_task(tcpListener())
+
+        async def sendMessages(): #
+            message = ""
+            while(message != 'E'):
+                #Call input() without blocking main thread
+                message = await asyncio.get_event_loop().run_in_executor(None, input, "What Hex Message do you want to send?"+
+                "\nStart with 0x:\n"
+                "or press E to exit\n")
+                if(message == "E"):
+                    pass
+                elif message.__len__() % 2 !=0 :
+                    print("Unable to Parse Bytes with uneven amount of Hex")
+                else:
+                    #whatever fucking works - Zach Cox
+                    
+                    bytesMessage = []
+                    message=message[2:]
+                    size= 0
+                    
+                    while(size + 1 < message.__len__()):
+                        bytesMessage.append(int(message[size:size+2], 16))
+                        size = size+2
+                   
+                    bytesarrayMessage : bytearray = bytearray(bytesMessage)
+                    print(bytesarrayMessage)
+                    commsChannel.send(bytesarrayMessage)
+                    #Give a chance for any immediate messages to come in
+                
+                time.sleep(.5)
+
+        #Allow time for tcpListener to start up before starting sendMessages()
+        #this way the tcpListener printout comes before the sendMessages printout
+        time.sleep(.1)
+        await sendMessages()
+        listening.cancel()
+        try:
+            await listening
+        except asyncio.CancelledError:
+            print("Extra Thread Closed")
+
+        commsChannel.shutdown(socket.SHUT_RDWR)
+        commsPort.shutdown(socket.SHUT_RDWR)
+        commsChannel.close()
+        commsPort.close()
+        print("Ports Closed")
+        time.sleep(1)
 
     def __init__(self):
         consInput = ""
         print("Ball Spinner Controller UI:")
-        print("Which Part Are You Interacting With?")
         while(consInput != 'E'):
             print("----------------------")
+            print("Which Part Are You Interacting With?")
             print("[1] SmartDot Module")
             print("[2] Motor")
-
+            print("[3] TCP")
             print("[E] Exit")
             consInput = input()
 
@@ -210,9 +303,15 @@ class CLI:
                 self.smartDotCLI()
             elif consInput == '2':
                 self.motorCLI()
+            elif consInput == '3':
+                try:
+                    asyncio.run(self.tcpCLI())
+                except KeyboardInterrupt: #If stopped by user, keep CLI running
+                    pass
             elif consInput == 'E':
                 pass
             else:
                 print("Invalid Input, Please Try Again\n")
 
 CLI()
+

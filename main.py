@@ -3,8 +3,37 @@ from BallSpinnerController.HMI import *
 import sys
 import threading
 
+def BSC_thread():
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "1":
+            BallSpinnerController.BallSpinnerController(shared_data, debug="1")
+    else:
+        BallSpinnerController.BallSpinnerController(shared_data)
+
+#In order to know whether or not the HMI can successfully run, we create an HMI thread class that stores an exception.
+class HMIThread(threading.Thread):
+    def __init__(self, shared_data):
+        super().__init__()
+        self.shared_data = shared_data
+        self.exception = False  # This will track if an exception occurs
+        self._stop_event = threading.Event()  # Event to stop the thread
+
+
+    def run(self):
+        try:
+            # UI initialization and method calls
+            ui = UI(self.shared_data)
+            ui.check_for_updates()
+            ui.run()
+        except:
+            print("The HMI does not have a display connected, running in headless mode.")
+            print("For information on how to open the HMI in SSH, view Brandon Woodward Spring25 Journal page 11")
+            self.exception = True
+            self._stop_event.set()  # Set the stop event to end the thread gracefully
+
 if __name__ == "__main__":
     shared_data = {
+            "can_launch_BSC": True,
             "ip": "",
             "port": "",
             "name": "",
@@ -21,28 +50,22 @@ if __name__ == "__main__":
             "error_text": "",
             "i": 0
     }
+        
+    # Create threads for the UI and the other loop
+    hmi_thread = HMIThread(shared_data)
 
+    # Start the HMI thread first
+    print("Starting the HMI thread")
+    hmi_thread.start()
+    print("HMI thread joining main thread")
+    #Calling join here allows us to get back to the main execution.
+    hmi_thread.join()
 
-def BSC_thread():
-    if len(sys.argv) > 1:
-        if sys.argv[1] == "1":
-            BallSpinnerController(shared_data, debug="1")
-    else:
-        BallSpinnerController(shared_data)
-
-# Create threads for the UI and the other loop
-ui_thread = threading.Thread(target=run_ui, args=(shared_data,))
-bsc_thread = threading.Thread(target=BSC_thread)
-
-# Start the threads
-print("Starting the HMI thread")
-ui_thread.start()
-print("Starting the BSC server thread")
-bsc_thread.start()
-
-# Join the threads to the main thread
-print("HMI thread joining main thread")
-ui_thread.join()
-print("BSC server thread joining main thread")
-bsc_thread.join()
-
+    if hmi_thread.exception == True: #If unsuccessful, launch in headless mode
+        #Run in headless mode because the hmi_thread did not launch successfully. 
+        shared_data["can_launch_BSC"] = False
+        bsc_thread = threading.Thread(target=BSC_thread)
+        print("Starting the BSC server thread")
+        bsc_thread.start()
+        print("BSC server thread joining main thread")
+        bsc_thread.join()

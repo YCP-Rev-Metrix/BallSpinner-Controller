@@ -77,14 +77,14 @@ class BallSpinnerController():
                 pass
 
     #Intended to launch the HMI and add it to the asyncio execution as a simulated thread
-    def launchHMI(self):
-        print("Attempting to laucnh HMI")
-        if os.environ.get("DISPLAY") is None:
-            print("No display detected. Running without GUI.")
-        else:
-            self.hmi = UI(self.shared_data)
-            self.hmi.check_for_updates()
-            self.hmi.run()
+    # def launchHMI(self):
+    #     print("Attempting to laucnh HMI")
+    #     if os.environ.get("DISPLAY") is None:
+    #         print("No display detected. Running without GUI.")
+    #     else:
+    #         self.hmi = UI(self.shared_data)
+    #         self.hmi.check_for_updates()
+    #         self.hmi.run()
 
     def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes

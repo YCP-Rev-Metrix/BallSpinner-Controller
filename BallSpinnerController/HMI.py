@@ -1,10 +1,16 @@
 import tkinter as tk
-
+import threading
+from BallSpinnerController import BallSpinnerController
 class UI:
     def __init__(self, data):
         self.data = data
         self.ui_update_frequency = 200  # Update the UI every 200 milliseconds
-        self.root = tk.Tk()
+        try:
+            self.root = tk.Tk()
+        except:
+            pass
+           
+
         self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
         self.root.geometry("800x480")
         self.root.title("Ball Spinner HMI")
@@ -23,6 +29,20 @@ class UI:
         self.create_SD_window()
         self.create_emergency_stop_button()
 
+        self.create_BSC_button()
+    
+    def BSC(self):
+        BallSpinnerController.BallSpinnerController(self.data)
+    def launch_BSC_thread_from_HMI(self):
+        if(self.data["can_launch_BSC"] == True):
+            print("The HMI is starting the BSC")
+            bsc_thread = threading.Thread(target=self.BSC)
+            print("Starting the BSC server thread")
+            bsc_thread.start()
+            # print("BSC server thread joining main thread")
+            # bsc_thread.join()
+        else:
+            print("Could not start BSC, must set data['can_launch_BSC'] to true")
 
 
     def run(self):
@@ -166,6 +186,9 @@ class UI:
         # Place the SD window on the right side
         self.sd_frame.place(relx=0.85, rely=0.5, anchor="center")
 
+    def create_BSC_button(self):
+        button = tk.Button(self.root, text="Start BSC Server", bg="white", command=self.launch_BSC_thread_from_HMI)
+        button.place(relx=0.5,rely=0.5, width=100, height=100)
     #Creates an emergency stop button in the bottom-left corner of the root window.
     def create_emergency_stop_button(self):
         bottom_left_button = tk.Button(self.root, text="EMERGENCY STOP MOTOR", bg="red", command=self.emergency_stop_click)
@@ -202,15 +225,20 @@ class UI:
 
 
 
-def run_ui(shared_data):
-    ui = UI(shared_data)
-    ui.check_for_updates()
-    ui.run()
+# def run_ui(shared_data):
+#     try:
+#         ui = UI(shared_data)
+#         ui.check_for_updates()
+#         ui.run()
+#     except:
+#         print("The HMI does not have a display connected, running in headless mode.")
+#         print("For information on how to open the HMI in SSH, view Brandon Woodward Spring25 Journal page 11")
 
 
 #run HMI.py to test it without connecting it to the server
 if __name__ == "__main__":
     shared_data = {
+            "can_launch_BSC": False,
             "ip": "",
             "name": "",
             "xl": "",

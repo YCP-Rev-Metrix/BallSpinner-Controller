@@ -44,5 +44,8 @@ bsc_thread.start()
 print("HMI thread joining main thread")
 ui_thread.join()
 print("BSC server thread joining main thread")
+
+## Add Graceful Disconnnect if KeyboardInterrupt is called (Closed by User)
 bsc_thread.join()
+
 

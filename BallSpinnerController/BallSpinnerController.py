@@ -9,6 +9,7 @@ from .MetaMotion import MetaMotion
 from .SmartDotEmulator import SmartDotEmulator
 from .iSmartDot import iSmartDot
 from .Motor import Motor
+from .StepperMotor import StepperMotor
 import socket
 import struct
 import sys
@@ -307,9 +308,9 @@ class BallSpinnerController():
                                     # First Motor Instruction:         
                                     #Turn On Motors
                                     print("Turning on motors")
-                                    self.PrimMotor = Motor(22)
-                                    self.secMotor1 = Motor(38)
-                                    self.secMotor2 = Motor(35)                
+                                    self.PrimMotor = StepperMotor(22)
+                                    self.secMotor1 = StepperMotor(38)
+                                    self.secMotor2 = StepperMotor(35)                
 
                                     self.PrimMotor.turnOnMotor(0)
                                     self.secMotor1.turnOnMotor(0)
@@ -317,7 +318,9 @@ class BallSpinnerController():
 
                                     self.mode = BSCModes.TAKING_SHOT_DATA
                                 
-                                self.PrimMotor.changeSpeed(int(data[3])) 
+                                primMotorSpeed = struct.unpack('<f', data[3:7])[0]
+                                print("Prim Motor Instruction: %f" % primMotorSpeed)
+                                self.PrimMotor.changeSpeed(primMotorSpeed) 
                                 self.secMotor1.changeSpeed(int(data[4])) 
                                 self.secMotor2.changeSpeed(int(data[5]))
 

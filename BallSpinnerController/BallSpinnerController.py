@@ -1,4 +1,6 @@
 import asyncio
+import random
+import os
 import threading
 import subprocess
 from mbientlab.warble import BleScanner
@@ -7,13 +9,14 @@ from .MetaMotion import MetaMotion
 from .SmartDotEmulator import SmartDotEmulator
 from .iSmartDot import iSmartDot
 from .Motor import Motor
+from .StepperMotor import StepperMotor
 import socket
 import struct
 import sys
 from time import sleep
 from enum import Enum
 from.Protocol import *
-
+from .HMI import UI
 # class syntax
 class BSCModes(Enum):
     STARTUP = 0
@@ -35,7 +38,7 @@ class BSCModes(Enum):
     
 class BallSpinnerController():
 
-    def __init__(self, debug="0", name="Ball Spinner Controller"):
+    def __init__(self, shared_data, debug="0", name="Ball Spinner Controller"):
         #Before Anything, Check if user has raised permissions
         try:
             #Manually Raise Permissiosn, if Possible
@@ -49,7 +52,10 @@ class BallSpinnerController():
         #determine global ip address
         self.iSmartDot = None
         self.scanner = None
-                                
+
+        #Create shared dictionary for HMI(GUI)
+        self.shared_data = shared_data
+    
         print("Debug Mode: ON") if self.debug else None 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -63,11 +69,23 @@ class BallSpinnerController():
             # ERROR: Not Connected to Internet
             pass 
         
+
         while(True):
             try:
+                # self.launchHMI()
                 self.socketHandler(ipAddr)
             except BrokenPipeError:
                 pass
+
+    #Intended to launch the HMI and add it to the asyncio execution as a simulated thread
+    def launchHMI(self):
+        print("Attempting to laucnh HMI")
+        if os.environ.get("DISPLAY") is None:
+            print("No display detected. Running without GUI.")
+        else:
+            self.hmi = UI(self.shared_data)
+            self.hmi.check_for_updates()
+            self.hmi.run()
 
     def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
@@ -76,6 +94,7 @@ class BallSpinnerController():
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.commsPort.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_address = (ipAddr, 8411)  # Replace 'localhost' with the server's IP if needed
+            self.shared_data["ip"] = f"Socket: {ipAddr}:{8411}"
             print('Server listening on {}:{}'.format(*server_address))
             self.commsPort.bind(server_address)
 
@@ -84,11 +103,10 @@ class BallSpinnerController():
             self.commsChannel, clientIp  = self.commsPort.accept()
             self.commsChannel.setblocking(True)
             try:
-                    asyncio.run(self.commsHandler()) 
-            except OSError: #Raised if Comms is forcibly closed by resetCommsPort while waiting for message
+                asyncio.run(self.commsHandler()) 
+
+            except OSError: #Raised if Comms is forcibly closed while waiting for message
                 print("Socket Closed, must restart")   
-                self.commsChannel.shutdown(socket.SHUT_RDWR)
-                self.commsPort.shutdown(socket.SHUT_RDWR)
                 self.commsChannel.close()
                 self.commsPort.close()
             except KeyboardInterrupt:
@@ -100,16 +118,6 @@ class BallSpinnerController():
             except BrokenPipeError:
                 print("Socket Closed Ubruptly, must restart")
                 pass
-
-    def resetCommsPort(self):
-        self.smartDot.stopGyro()
-        self.smartDot.stopAccel()
-        self.smartDot.stopMag()
-        del self.PrimMotor
-        del self.secMotor1
-        del self.secMotor2
-        self.commsChannel.close()
-        self.commsPort.close()
     
     async def smartDotHandler(self):
         print("Handling SmartDot:")
@@ -119,8 +127,8 @@ class BallSpinnerController():
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
-            except Exception as e:
-                raise self.resetCommsPort()
+            except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
+                self.smartDot.stopAccel()
 
         def magDataSignal(dataBytes : bytearray):
             bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
@@ -128,8 +136,8 @@ class BallSpinnerController():
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
-            except BrokenPipeError:
-                raise self.resetCommsPort()
+            except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
+                self.smartDot.stopMag()
         
         def gyroDataSignal(dataBytes : bytearray):
             bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
@@ -137,9 +145,8 @@ class BallSpinnerController():
             bytesData.extend(dataBytes)
             try:
                 self.commsChannel.sendall(bytesData)
-            except Exception as e:
-                self.resetCommsPort()
-                raise BrokenPipeError
+            except Exception: # Assumed Exception is caused from broken pipe, can look into another time
+               self.smartDot.stopGyro()
 
         def lightDataSignal(dataBytes : bytearray):
             bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
@@ -149,11 +156,9 @@ class BallSpinnerController():
             bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
             try:
                 self.commsChannel.sendall(bytesData)
-                print(bytesData)
-            except Exception as e:
-                print(e)
-                self.resetCommsPort()
-                raise BrokenPipeError
+            except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                print(f"Error Occured Somewhere in BSC: {e}")
+                self.smartDot.stopLight()
             
         self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
         #Instantly Setting the Start Configs for the 9DOF's to skip implementation
@@ -184,8 +189,15 @@ class BallSpinnerController():
                     data = await loop.run_in_executor(None, self.commsChannel.recv, 1024)
                     #parse message
                     if not data == b'':
-                        print("Received: %s" % data.hex())  if not self.debug else None
+                        print("Received: %s" % data.hex())  if self.debug else None
+                        #Pass the last message to the HMI
+                        # message_type = MsgType(data[0])
+                        # if message_type is not None:
+                        self.shared_data["message_type"] = MsgType.name_from_value(data[0])
+                        
                         match data[0]: 
+                            #shared_data["message_type"] =
+                            #shared_data["message_type"] = message_enum.name
                             case(MsgType.A_B_INIT_HANDSHAKE): #A_B_INIT_HANDSHAKE 
                                 #Message Received: | Msg Type: 0x01 | Msg Size: 0x0001 | RandomByte: XXXX 
                                 print("Received: APP_INIT Message") if self.debug else None
@@ -247,10 +259,11 @@ class BallSpinnerController():
                                 #Check if connection was successful
                                 if self.smartDot.connect(smartDotMACStr):   
                                     bytesData = bytearray([0x08, 0x00, 0x08]) #send B_A_RECEIVE_CONFIG_INFO
+                                    print("sending bytesData")
                                     #bytesData.extend(data[3:9]) 
                                     #determine rate and ranges
                                     bytesData.extend(bitMappings.sendConfigSettings(self.smartDot.XL_availSampleRate, self.smartDot.XL_availRange,
-                                                                                    self.smartDot.GY_availSampleRate, self.smartDot.XL_availRange,
+                                                                                    self.smartDot.GY_availSampleRate, self.smartDot.GY_availRange,
                                                                                     self.smartDot.MG_availSampleRate, self.smartDot.MG_availRange,
                                                                                     self.smartDot.LT_availSampleRate, self.smartDot.LT_availRange))
                                     self.commsChannel.send(bytesData)
@@ -260,15 +273,24 @@ class BallSpinnerController():
                                     #NEED TO CHECK IF NOT TRUE, SEND ERROR
                             
                             case(MsgType.A_B_RECEIVE_CONFIG_INFO): #A_B_RECEIVE_CONFIG_INFO
-                                print(data)
+                                print(data.hex())
                                 XLConfigSampleRate = data[3] >> 4 # Parse XL Bytes
-
+                                GYConfigSampleRate = data[4] >> 4 # Parse GY Bytes
+                                MGConfigSampleRate = data[5] >> 4 # Parse MG Bytes
+                                LTConfigSampleRate = data[6] >> 4 # Parse LT Bytes
+                                
+                                print(LTConfigSampleRate)
                                 #create List of XL Rates to set
                                 XLSampleRates = [12.5, 25, 50, 100, 200, 400, 800, 1600] 
+                                GYSampleRates = [25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
+                                MGSampleRates = [2, 6, 8, 10, 15, 20, 25, 30]
+                                LTSampleRates = [.5, 1, 2, 5, 10, 20]
 
-                                XLConfigSampleRate = XLSampleRates[XLConfigSampleRate]
-                                print("Setting XL Rate to %i" % XLConfigSampleRate)    
-
+                                self.smartDot.setSampleRates(XL = XLSampleRates[XLConfigSampleRate],
+                                                             GY = GYSampleRates[GYConfigSampleRate],
+                                                             MG = MGSampleRates[MGConfigSampleRate],
+                                                             LT = LTSampleRates[LTConfigSampleRate])
+                                
                             case(MsgType.A_B_MOTOR_INSTRUCTIONS): #MOTOR_INSTRUCTIONS Message
                                 #print("Received Motor Instruction")
                                 if self.mode == BSCModes.READY_FOR_INSTRUCTIONS: 
@@ -286,9 +308,9 @@ class BallSpinnerController():
                                     # First Motor Instruction:         
                                     #Turn On Motors
                                     print("Turning on motors")
-                                    self.PrimMotor = Motor(22)
-                                    self.secMotor1 = Motor(38)
-                                    self.secMotor2 = Motor(35)                
+                                    self.PrimMotor = StepperMotor(22)
+                                    self.secMotor1 = StepperMotor(38)
+                                    self.secMotor2 = StepperMotor(35)                
 
                                     self.PrimMotor.turnOnMotor(0)
                                     self.secMotor1.turnOnMotor(0)
@@ -296,7 +318,9 @@ class BallSpinnerController():
 
                                     self.mode = BSCModes.TAKING_SHOT_DATA
                                 
-                                self.PrimMotor.changeSpeed(int(data[3])) 
+                                primMotorSpeed = struct.unpack('<f', data[3:7])[0]
+                                print("Prim Motor Instruction: %f" % primMotorSpeed)
+                                self.PrimMotor.changeSpeed(primMotorSpeed) 
                                 self.secMotor1.changeSpeed(int(data[4])) 
                                 self.secMotor2.changeSpeed(int(data[5]))
 
@@ -317,6 +341,7 @@ class BallSpinnerController():
                                     self.smartDot.stopAccel()
                                     self.smartDot.stopGyro()
                                     self.smartDot.stopMag()
+                                    self.smartDot.stopLight()
                                     self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                                     self.smartDotHandlerThread.cancel()
 
@@ -396,7 +421,7 @@ class BallSpinnerController():
         except asyncio.CancelledError: #Called when BLE Thread is stopped
             pass
 
-        except BrokenPipeError:
+        except BrokenPipeError: #If Comms Crash while Scanning
             pass
 
         finally:

@@ -57,14 +57,14 @@ class MetaMotion(iSmartDot):
             self.XL_availSampleRate = MetaMotion.XL_availSampleRate
             self.XL_availRange = MetaMotion.XL_availRange
             self.GY_availSampleRate = MetaMotion.GY_availSampleRate
-            self.GY_availRange = MetaMotion.GY_availSampleRate
+            self.GY_availRange = MetaMotion.GY_availRange
             self.MG_availSampleRate = MetaMotion.MG_availSampleRate
             self.MG_availRange = MetaMotion.MG_availRange
             self.LT_availRange = MetaMotion.LT_availRange
             self.LT_availSampleRate = MetaMotion.LT_availSampleRate
 
             #set default Sample Rates and Ranges
-            self.setSampleRates(XL=100, GY=100, MG=10)
+            self.setSampleRates(XL=100, GY=100, MG=10, LT=.5)
             #self.setSampleRanges(XL=100, GY=100, MG=10)
 
             self.XL_Range = 2
@@ -176,7 +176,6 @@ class MetaMotion(iSmartDot):
         mess = sampleCountInBytes + timeStampInBytes + valInBytes 
         try:
             self.lightDataSig(mess)
-            print("Encoded Data " + valInBytes.hex()+ " 0000 0000")
         except Exception as e:
             print(parsedData)
             print(e)
@@ -266,7 +265,10 @@ class MetaMotion(iSmartDot):
         self.LightSampleCount = 0
 
     def stopLight(self):
-        pass
+        libmetawear.mbl_mw_als_ltr329_stop(self.device.board)
+        libmetawear.mbl_mw_datasignal_unsubscribe(self.lightSig)
+
+
 
     def turnOnRedLED(self):
         pattern = LedPattern(delay_time_ms= 5000, repeat_count= Const.LED_REPEAT_INDEFINITELY)
@@ -294,7 +296,8 @@ class MetaMotion(iSmartDot):
             #Setting the Sample Rate is done in the API based on
             #Set Sample Rate
             self.XL_SampleRate = XL
-        
+            print("Accelerometer Set To %sHz " % self.XL_SampleRate)
+
         if GY != None: 
             #Create Mapping of Enums to Sample Rates
 
@@ -310,7 +313,7 @@ class MetaMotion(iSmartDot):
                     GyroBoschOdr._3200Hz : 3200
             }
             #Calculate Closest sample rate of what was entered vs. what is possible to set
-            dataRate = min(GYDataRates, key=lambda k: abs(GYDataRates[k] - MG))
+            dataRate = min(GYDataRates, key=lambda k: abs(GYDataRates[k] - GY))
 
             print("Gyroscope Set To %sHz " % GYDataRates[dataRate])
             
@@ -365,9 +368,9 @@ class MetaMotion(iSmartDot):
             ] 
 
             #Calculate Closest sample rate of what was entered vs. what is possible to set
-            dataRate = min(LTDataRates, key=lambda k: abs(LTDataRates[k] - MG))
+            dataRate = min(LTDataRates, key=lambda k: abs(LTDataRates[k] - LT))
 
-            print("Magnetometer Set To %sHz " % LTDataRates[dataRate])
+            print("Light Set To %sHz " % LTDataRates[dataRate])
             
             #Choose Enum associated with set value
             LTDataRates = tuple(LTDataRates.keys())

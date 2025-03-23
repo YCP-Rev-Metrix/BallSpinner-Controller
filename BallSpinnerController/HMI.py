@@ -1,94 +1,78 @@
 import tkinter as tk
 import threading
 from BallSpinnerController import BallSpinnerController
-class UI:
+class HMI:
     def __init__(self, data):
+        
+        #This is our shared data dictionary that we check for changes in 
         self.data = data
-        self.ui_update_frequency = 200  # Update the UI every 200 milliseconds
+        
+        # How fast we check shared data dictionary to update values in the UI 
+        self.ui_update_frequency = 200  
+        
+        #This try catch is for the automatic headless display when we fail to open HMI (most likely to occur on unsetup SSH see BWoodward Spring Journal 2025)
         try:
             self.root = tk.Tk()
-        except:
+        except Exception as e:
+            print(e)
             pass
-           
 
-        self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
-        self.root.geometry("800x480")
-        self.root.title("Ball Spinner HMI")
-        self.root.configure(bg=data["bg_color"])  # Set the background color of the window
+################################################### Function variables ###################################################\
         self.active_motor = None  # Track which motor's popup is active
         self.emergency_stop_clicks = 0
         self.is_emergency_stopped = False
-        # Build the UI components
+
+################################################### Initialize UI ###################################################\
+        self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
+        self.root.geometry("800x480")
+        self.root.title("Ball Spinner HMI")
+        self.root.configure(bg=self.data["bg_color"])  # Set the background color of the window
+
+        #Create root frame
+        self.frame = tk.Frame(self.root)
+        #self.frame.pack(side="top", fill="both", expand=True)
+
         self.title_label = self.build_title_label()
         self.e_frame, self.e_label = self.build_error_box()
         self.close_button = self.build_close_button()
         self.ip_label = self.build_ip_port_text()
         self.mode_label, self.message_label = self.build_mode_and_message_labels()
+
+        #List of elements to initially hide
+        self.initial_ui_elements_to_hide = {self.ip_label, self.mode_label, self.message_label}
+        self.hide_ui_elements(self.initial_ui_elements_to_hide)
         self.create_grid()
         self.create_motor_popup()
         self.create_SD_window()
         self.create_emergency_stop_button()
+        self.bsc_button = self.create_BSC_button()
 
-        self.create_BSC_button()
-    
-    def BSC(self):
-        BallSpinnerController.BallSpinnerController(self.data)
-    def launch_BSC_thread_from_HMI(self):
-        if(self.data["can_launch_BSC"] == True):
-            print("The HMI is starting the BSC")
-            bsc_thread = threading.Thread(target=self.BSC)
-            print("Starting the BSC server thread")
-            bsc_thread.start()
-            # print("BSC server thread joining main thread")
-            # bsc_thread.join()
-        else:
-            print("Could not start BSC, must set data['can_launch_BSC'] to true")
-
-
+################################################### Utility Functions ################################################### 
+    def hide_ui_elements(self, ui_element_list):
+        for e in ui_element_list:
+            e.lift()#pass in root frame
+    def show_ui_elements(self, ui_element_list):
+         for e in ui_element_list:
+            e.lower()
+################################################### Initialize Loops ###################################################\
     def run(self):
         self.root.mainloop()
 
-    #This is our loop for updating data within the HMI. It checks for changes in the shared dictionary that both the BSC and HMI have.
     def check_for_updates(self):
-        if self.data["error_text"] != self.e_label.cget("text"):
-            self.e_label.config(text=self.data["error_text"])
-        if self.data["ip"] != self.ip_label.cget("text"):
-            self.ip_label.config(text=self.data["ip"])
-        if self.data["message_type"] != self.message_label.cget("text"):
-            self.message_label.config(text=self.data["message_type"])
+        updates = {
+            self.e_label: self.data["error_text"],
+            self.ip_label: self.data["ip"],
+            self.message_label: self.data["message_type"]
+        }
 
-        #Cause this function to call itself, recurring with ui_update_frequency in ms.
-        self.root.after(self.ui_update_frequency, self.check_for_updates)  # Check every 1000 milliseconds (1 second)
+        for label, new_text in updates.items():
+            if label.cget("text") != new_text:
+                label.config(text=new_text)
 
-    def close_window(self):
-        self.root.destroy()
-        # Set the error text and update the error label
+        self.root.after(self.ui_update_frequency, self.check_for_updates)
 
-    # Create a title "Ball Spinner Controller"
-    def build_title_label(self):
-        title = tk.Label(self.root, text="Ball Spinner Controller", bg=self.data["bg_color"])
-        title.pack(side='top', fill='both')
-        return title
-
-    # Create the error frame and label
-    def build_error_box(self):
-        e_frame = tk.Frame(self.root, bg='gray')
-        e_frame.pack(side='top')
-        e_text = tk.Label(e_frame, text=f"Error: ", fg='red', width=50)
-        e_text.pack()
-        return e_frame, e_text
-
-    # Create a button to close the window
-    def build_close_button(self):
-        close_button = tk.Button(self.root, text="Close", command=self.close_window)
-        close_button.pack(side='bottom', pady=5)
-        return close_button
-
+################################################### Basic Data Labels ###################################################
     def build_mode_and_message_labels(self):
-        # # Create a frame to hold the labels on the left
-        # left_frame = tk.Frame(self.root, bg=self.data["bg_color"])  # Optional background color for visibility
-        # left_frame.pack(side='left', padx=0, pady=20, anchor="nw")
-
         # First label
         label1 = tk.Label(self.root, text="Mode: ", bg="lightgray", padx=10, pady=5)
         label1.place(relx=.05, rely=.4)  # Place on the left side with a bit of padding
@@ -103,7 +87,23 @@ class UI:
         label = tk.Label(self.root, text="Socket: 11.1.1.1.1:612941",  padx=10, pady=10)
         label.pack(side='bottom')
         return label
+   
+    # Create a title "Ball Spinner Controller"
+    def build_title_label(self):
+        title = tk.Label(self.root, text="Ball Spinner Controller", bg=self.data["bg_color"])
+        title.pack(side='top', fill='both')
+        return title
 
+    # Create the error frame and label
+    def build_error_box(self):
+        e_frame = tk.Frame(self.root, bg='gray')
+        e_frame.pack(side='top')
+        e_text = tk.Label(e_frame, text=f"Error: ", fg='red', width=50)
+        e_text.pack()
+        return e_frame, e_text
+
+
+################################################### Motor Data popup ###################################################
     def create_motor_popup(self):
         """Creates an embedded popup frame that appears inside the UI."""
         self.popup_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
@@ -147,23 +147,8 @@ class UI:
         self.popup_frame.place_forget()
         self.active_motor = None  # Reset active motor
 
-    def create_grid(self): 
-        """Creates a frame with buttons to open/hide the popup."""
-        grid_frame = tk.Frame(self.root, bg=self.data["bg_color"])
-        grid_frame.pack(pady=20)
 
-        # Configure grid inside the frame
-        for i in range(3):
-            grid_frame.grid_columnconfigure(i, weight=1)
-
-        grid_frame.grid_rowconfigure(0, weight=1)
-
-        # Create buttons that toggle the popup
-        for i in range(3):
-            button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="lightblue", width=10, height=2,
-                               command=lambda m=i+1: self.toggle_popup(m))
-            button.grid(row=0, column=i, padx=10, pady=10)
-
+################################################### SD Data Display ###################################################
     #Create the SD window on the right side of the UI
     def create_SD_window(self):
         self.sd_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
@@ -186,11 +171,45 @@ class UI:
         # Place the SD window on the right side
         self.sd_frame.place(relx=0.85, rely=0.5, anchor="center")
 
+################################################### Create Buttons ###################################################
+
+    # Create a button to close the window
+    def build_close_button(self):
+        close_button = tk.Button(self.root, text="Close", command=self.close_window)
+        close_button.pack(side='bottom', pady=5)
+        return close_button
+    
+    #create button for starting BSC server
     def create_BSC_button(self):
         button = tk.Button(self.root, text="Start BSC Server", bg="white", command=self.launch_BSC_thread_from_HMI)
         button.place(relx=0.5,rely=0.5, width=100, height=100)
-    #Creates an emergency stop button in the bottom-left corner of the root window.
+        return button
+
+        
+    ####### Grid of Motor Toggle Buttons #######
+    def create_grid(self): 
+        #Create Grid in center to place motor name Buttons 
+        grid_frame = tk.Frame(self.root, bg=self.data["bg_color"])
+        grid_frame.pack(pady=20)
+
+        # Configure grid inside the frame
+        for i in range(3):
+            grid_frame.grid_columnconfigure(i, weight=1)
+
+        grid_frame.grid_rowconfigure(0, weight=1)
+
+        # Create buttons that toggle the popup
+        for i in range(3):
+            button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="lightblue", width=10, height=2,
+                               command=lambda m=i+1: self.toggle_popup(m))
+            button.grid(row=0, column=i, padx=10, pady=10)
+
+           
+    
+       
+    ####### Emergency Stop Button #######
     def create_emergency_stop_button(self):
+        #Creates an emergency stop button in the bottom-left corner of the root window.
         bottom_left_button = tk.Button(self.root, text="EMERGENCY STOP MOTOR", bg="red", command=self.emergency_stop_click)
         bottom_left_button.place(relx=0.05, rely=0.95, anchor="sw", width=200, height=50)
         
@@ -200,7 +219,9 @@ class UI:
 
         # Variable to store the timer ID
         self.timer_id = None
+        
 
+################################################### Timer Events ###################################################
     def start_emergency_stop_timer(self, event):
         """Starts the timer when the button is pressed and waits for 3 seconds."""
         # Start a 3-second timer (3000 milliseconds)
@@ -211,6 +232,8 @@ class UI:
         if self.timer_id and self.is_emergency_stopped == False:
             self.root.after_cancel(self.timer_id)  # Cancel the action if released early
             self.timer_id = None
+
+################################################### Button Functions ###################################################
 
     #Functionality of emergency stop
     def emergency_stop_click(self): ####TODO: Should add a timer to reset clicks to 0
@@ -223,16 +246,46 @@ class UI:
         self.is_emergency_stopped = True
         self.data["error_text"] = f"IMPLEMENT STOP OF MOTOR"
 
+    def close_window(self):
+        self.root.destroy()
+        # Set the error text and update the error label
+
+################################################### Initialize BSC ###################################################
+    
+    def BSC(self):
+        BallSpinnerController.BallSpinnerController(self.data)
+    def launch_BSC_thread_from_HMI(self):
+        if(self.data["can_launch_BSC"] == True):
+            print("The HMI is starting the BSC")
+            bsc_thread = threading.Thread(target=self.BSC)
+            print("Starting the BSC server thread")
+            bsc_thread.start()
+            # print("BSC server thread joining main thread")
+            # bsc_thread.join()
+        else:
+            print("Could not start BSC, must set data['can_launch_BSC'] to true")
+
+        #Modify the current UI layout to fit the server mode.
+        self.bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
+        self.show_ui_elements(self.bsc_ui_elements_to_show)
+
+        self.bsc_ui_elements_to_hide = {self.bsc_button}
+        self.hide_ui_elements(self.bsc_ui_elements_to_hide)
+
+        
 
 
-# def run_ui(shared_data):
-#     try:
-#         ui = UI(shared_data)
-#         ui.check_for_updates()
-#         ui.run()
-#     except:
-#         print("The HMI does not have a display connected, running in headless mode.")
-#         print("For information on how to open the HMI in SSH, view Brandon Woodward Spring25 Journal page 11")
+
+
+################################################### Run as Main Testing (Local Only) ################################################### 
+def run_ui(shared_data):
+    try:
+        ui = UI(shared_data)
+        ui.check_for_updates()
+        ui.run()
+    except:
+        print("The HMI does not have a display connected, running in headless mode.")
+        print("For information on how to open the HMI in SSH, view Brandon Woodward Spring25 Journal page 11")
 
 
 #run HMI.py to test it without connecting it to the server

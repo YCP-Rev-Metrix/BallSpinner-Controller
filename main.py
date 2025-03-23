@@ -22,10 +22,11 @@ class HMIThread(threading.Thread):
     def run(self):
         try:
             # UI initialization and method calls
-            ui = UI(self.shared_data)
+            ui = HMI(self.shared_data)
             ui.check_for_updates()
             ui.run()
-        except:
+        except Exception as e:
+            print(e)
             print("The HMI does not have a display connected, running in headless mode.")
             print("For information on how to open the HMI in SSH, view Brandon Woodward Spring25 Journal page 11")
             self.exception = True

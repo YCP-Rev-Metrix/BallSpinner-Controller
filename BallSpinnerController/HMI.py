@@ -25,35 +25,47 @@ class HMI:
 ################################################### Initialize UI ###################################################\
         self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
         self.root.geometry("800x480")
+        self.screen_width = 800
+        self.screen_height = 480
+        
         self.root.title("Ball Spinner HMI")
         self.root.configure(bg=self.data["bg_color"])  # Set the background color of the window
 
         #Create root frame
-        self.frame = tk.Frame(self.root)
-        #self.frame.pack(side="top", fill="both", expand=True)
+        #Purpose of this frame is to create a widget that everything is in. This way we can lift(self.frame) or lower(self.frame) to hide or show widgets.
+        #When making children widgets and placing them using place(), grid(), or pack() make sure to include (in_=self.frame)
+        ## IF making elements inside another frame ELSEWHERE: new_frame.pack(in_=self.frame) and children use in_=new_frame 
+        self.frame = tk.Frame(self.root, bg=self.data["bg_color"])
+        self.frame.pack(side="top", fill="both", expand=True)
+
 
         self.title_label = self.build_title_label()
         self.e_frame, self.e_label = self.build_error_box()
         self.close_button = self.build_close_button()
         self.ip_label = self.build_ip_port_text()
         self.mode_label, self.message_label = self.build_mode_and_message_labels()
-
-        #List of elements to initially hide
-        self.initial_ui_elements_to_hide = {self.ip_label, self.mode_label, self.message_label}
-        self.hide_ui_elements(self.initial_ui_elements_to_hide)
-        self.create_grid()
-        self.create_motor_popup()
-        self.create_SD_window()
-        self.create_emergency_stop_button()
+        self.motor_buttons = self.create_motor_buttons_grid()
+        self.motor_popup = self.create_motor_popup()
+        self.sd_window = self.create_SD_window()
+        self.emergency_stop_button = self.create_emergency_stop_button()
         self.bsc_button = self.create_BSC_button()
+        self.local_mode_button = self.create_local_mode_button()
+        #List of elements to initially hide
+        self.initial_ui_elements_to_hide = {self.ip_label, self.mode_label, self.message_label, self.emergency_stop_button, self.sd_window, self.motor_buttons}
+        self.hide_ui_elements(self.initial_ui_elements_to_hide)
+        
 
 ################################################### Utility Functions ################################################### 
     def hide_ui_elements(self, ui_element_list):
         for e in ui_element_list:
-            e.lift()#pass in root frame
+            e.lower(self.frame)#pass in root frame
     def show_ui_elements(self, ui_element_list):
          for e in ui_element_list:
-            e.lower()
+            e.lift(self.frame)
+            
+    #TODO: function for back button from main local or bsc screen         
+    def reset_to_init_state(self):
+        pass
 ################################################### Initialize Loops ###################################################\
     def run(self):
         self.root.mainloop()
@@ -75,29 +87,29 @@ class HMI:
     def build_mode_and_message_labels(self):
         # First label
         label1 = tk.Label(self.root, text="Mode: ", bg="lightgray", padx=10, pady=5)
-        label1.place(relx=.05, rely=.4)  # Place on the left side with a bit of padding
+        label1.place(in_=self.frame, relx=.05, rely=.4)  # Place on the left side with a bit of padding
 
         # Second label
         label2 = tk.Label(self.root, text="Last Message Received: ", bg="lightgray", padx=10, pady=5)
-        label2.place(relx=.05, rely=.5)  # Place it right below the first label with some vertical space
+        label2.place(in_=self.frame, relx=.05, rely=.5)  # Place it right below the first label with some vertical space
 
         return label1, label2
 
     def build_ip_port_text(self):
-        label = tk.Label(self.root, text="Socket: 11.1.1.1.1:612941",  padx=10, pady=10)
-        label.pack(side='bottom')
+        label = tk.Label(self.root, text="Socket: 11.1.1.1.1:64920",  padx=10, pady=10)
+        label.pack(in_=self.frame, side='bottom')
         return label
    
     # Create a title "Ball Spinner Controller"
     def build_title_label(self):
         title = tk.Label(self.root, text="Ball Spinner Controller", bg=self.data["bg_color"])
-        title.pack(side='top', fill='both')
+        title.pack(in_=self.frame,side='top', fill='both')
         return title
 
     # Create the error frame and label
     def build_error_box(self):
         e_frame = tk.Frame(self.root, bg='gray')
-        e_frame.pack(side='top')
+        e_frame.pack(in_=self.frame, side='top')
         e_text = tk.Label(e_frame, text=f"Error: ", fg='red', width=50)
         e_text.pack()
         return e_frame, e_text
@@ -106,23 +118,24 @@ class HMI:
 ################################################### Motor Data popup ###################################################
     def create_motor_popup(self):
         """Creates an embedded popup frame that appears inside the UI."""
-        self.popup_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
+        popup_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
 
         # Labels inside the popup
-        self.popup_title = tk.Label(self.popup_frame, text="Motor Details", font=("Arial", 14, "bold"), bg="lightgray")
-        self.popup_speed = tk.Label(self.popup_frame, text="", bg="lightgray")
-        self.popup_temp = tk.Label(self.popup_frame, text="", bg="lightgray")
-        self.popup_status = tk.Label(self.popup_frame, text="", bg="lightgray")
+        self.popup_title = tk.Label(popup_frame, text="Motor Details", font=("Arial", 14, "bold"), bg="lightgray")
+        self.popup_speed = tk.Label(popup_frame, text="", bg="lightgray")
+        self.popup_temp = tk.Label(popup_frame, text="", bg="lightgray")
+        self.popup_status = tk.Label(popup_frame, text="", bg="lightgray")
 
         # Close button (alternative way to close)
-        self.close_button = tk.Button(self.popup_frame, text="Close", command=self.hide_popup)
+        self.close_button = tk.Button(popup_frame, text="Close", command=self.hide_popup)
 
         # Pack elements inside the popup frame
-        self.popup_title.pack(pady=5)
-        self.popup_speed.pack()
-        self.popup_temp.pack()
-        self.popup_status.pack()
-        self.close_button.pack(pady=5)
+        self.popup_title.pack(in_=popup_frame, pady=5)
+        self.popup_speed.pack(in_=popup_frame,)
+        self.popup_temp.pack(in_=popup_frame,)
+        self.popup_status.pack(in_=popup_frame,)
+        self.close_button.pack(in_=popup_frame, pady=5)
+        return popup_frame        
 
     def toggle_popup(self, motor_id):
         """Shows or hides the popup based on the button click."""
@@ -139,26 +152,27 @@ class HMI:
         self.popup_status.config(text=f"Status: Running")
 
         # Place the popup in the UI
-        self.popup_frame.place(relx=0.5, rely=0.5, anchor="center")
+        self.motor_popup.place(in_=self.frame, relx=0.5, rely=0.5, anchor="center")
         self.active_motor = motor_id  # Store active motor
 
     def hide_popup(self):
         """Hides the popup."""
-        self.popup_frame.place_forget()
+        self.motor_popup.place_forget()
         self.active_motor = None  # Reset active motor
+    
 
 
 ################################################### SD Data Display ###################################################
     #Create the SD window on the right side of the UI
     def create_SD_window(self):
-        self.sd_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
+        sd_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
 
         # Add labels inside the SD window
-        self.sd_title = tk.Label(self.sd_frame, text="SD Information", font=("Arial", 14, "bold"), bg="lightgray")
-        self.sd_xl = tk.Label(self.sd_frame, text="XL: --", bg="lightgray")
-        self.sd_gy = tk.Label(self.sd_frame, text="GY: --", bg="lightgray")
-        self.sd_mg = tk.Label(self.sd_frame, text="MG: --", bg="lightgray")
-        self.sd_lt = tk.Label(self.sd_frame, text="LT: --", bg="lightgray")
+        self.sd_title = tk.Label(sd_frame, text="SD Information", font=("Arial", 14, "bold"), bg="lightgray")
+        self.sd_xl = tk.Label(sd_frame, text="XL: --", bg="lightgray")
+        self.sd_gy = tk.Label(sd_frame, text="GY: --", bg="lightgray")
+        self.sd_mg = tk.Label(sd_frame, text="MG: --", bg="lightgray")
+        self.sd_lt = tk.Label(sd_frame, text="LT: --", bg="lightgray")
 
         # Pack elements inside the SD window
         self.sd_title.pack(pady=5)
@@ -169,7 +183,8 @@ class HMI:
 
 
         # Place the SD window on the right side
-        self.sd_frame.place(relx=0.85, rely=0.5, anchor="center")
+        sd_frame.place(relx=0.85, rely=0.5, anchor="center")
+        return sd_frame
 
 ################################################### Create Buttons ###################################################
 
@@ -178,19 +193,38 @@ class HMI:
         close_button = tk.Button(self.root, text="Close", command=self.close_window)
         close_button.pack(side='bottom', pady=5)
         return close_button
-    
+
+    #create button for starting local mode
+    def create_local_mode_button(self):
+        # Get the size of the button
+        btn_width = 150
+        btn_height = 100
+        
+        # Calculate position to center the button
+        position_top = self.screen_height // 2 - btn_height // 2
+        position_left = self.screen_width // 2 - btn_width // 2
+        button = tk.Button(self.root, text="Start Local Mode", bg="white", command=self.launch_local_mode)
+        button.place(in_=self.frame, x=position_left - 150, y=position_top, width=btn_width, height=btn_height)
+        return button
     #create button for starting BSC server
     def create_BSC_button(self):
+        # Get the size of the button
+        btn_width = 150
+        btn_height = 100
+        
+        # Calculate position to center the button
+        position_top = self.screen_height // 2 - btn_height // 2
+        position_left = self.screen_width // 2 - btn_width // 2
         button = tk.Button(self.root, text="Start BSC Server", bg="white", command=self.launch_BSC_thread_from_HMI)
-        button.place(relx=0.5,rely=0.5, width=100, height=100)
+        button.place(in_=self.frame, x=position_left + 150, y=position_top, width=btn_width, height=btn_height)
         return button
 
         
     ####### Grid of Motor Toggle Buttons #######
-    def create_grid(self): 
+    def create_motor_buttons_grid(self): 
         #Create Grid in center to place motor name Buttons 
         grid_frame = tk.Frame(self.root, bg=self.data["bg_color"])
-        grid_frame.pack(pady=20)
+        grid_frame.pack(in_=self.frame, pady=20)
 
         # Configure grid inside the frame
         for i in range(3):
@@ -202,8 +236,8 @@ class HMI:
         for i in range(3):
             button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="lightblue", width=10, height=2,
                                command=lambda m=i+1: self.toggle_popup(m))
-            button.grid(row=0, column=i, padx=10, pady=10)
-
+            button.grid(in_=grid_frame, row=0, column=i, padx=10, pady=10)
+        return grid_frame
            
     
        
@@ -211,7 +245,7 @@ class HMI:
     def create_emergency_stop_button(self):
         #Creates an emergency stop button in the bottom-left corner of the root window.
         bottom_left_button = tk.Button(self.root, text="EMERGENCY STOP MOTOR", bg="red", command=self.emergency_stop_click)
-        bottom_left_button.place(relx=0.05, rely=0.95, anchor="sw", width=200, height=50)
+        bottom_left_button.place(in_=self.frame, relx=0.05, rely=0.95, anchor="sw", width=200, height=50)
         
         # Bind events to track the press and release
         bottom_left_button.bind("<ButtonPress-1>", self.start_emergency_stop_timer)
@@ -219,6 +253,7 @@ class HMI:
 
         # Variable to store the timer ID
         self.timer_id = None
+        return bottom_left_button
         
 
 ################################################### Timer Events ###################################################
@@ -269,10 +304,15 @@ class HMI:
         self.bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
         self.show_ui_elements(self.bsc_ui_elements_to_show)
 
-        self.bsc_ui_elements_to_hide = {self.bsc_button}
+        self.bsc_ui_elements_to_hide = {self.bsc_button, self.local_mode_button}
         self.hide_ui_elements(self.bsc_ui_elements_to_hide)
 
-        
+################################################### Initialize Local Mode ###################################################
+    def launch_local_mode(self):
+        self.bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
+        self.show_ui_elements(self.bsc_ui_elements_to_show)
+        self.bsc_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
+        self.hide_ui_elements(self.bsc_ui_elements_to_hide)
 
 
 

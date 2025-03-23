@@ -224,12 +224,11 @@ class BallSpinnerController():
                                 pass
                             
                             case(MsgType.A_B_START_SCAN_FOR_SD): #A_B_START_SCAN_FOR_SD Message
-                                #If the 
-                                self.mode = BSCModes.BLUETOOTH_SCANNING
-                                
+                                #There is a bug on the Application that on connection 2 Start Scans are being sent
                                 #Confirm only one Scanner is open
-                                if self.scanner == None:
+                                if self.mode != BSCModes.BLUETOOTH_SCANNING:
                                     self.scanner = asyncio.create_task(self.tCPscanAll(self.debug))
+                                    self.mode = BSCModes.BLUETOOTH_SCANNING
 
                             case(MsgType.A_B_CHOSEN_SD): #A_B_CHOSEN_SD Message
                                 try:
@@ -273,13 +272,11 @@ class BallSpinnerController():
                                     #NEED TO CHECK IF NOT TRUE, SEND ERROR
                             
                             case(MsgType.A_B_RECEIVE_CONFIG_INFO): #A_B_RECEIVE_CONFIG_INFO
-                                print(data.hex())
                                 XLConfigSampleRate = data[3] >> 4 # Parse XL Bytes
                                 GYConfigSampleRate = data[4] >> 4 # Parse GY Bytes
                                 MGConfigSampleRate = data[5] >> 4 # Parse MG Bytes
                                 LTConfigSampleRate = data[6] >> 4 # Parse LT Bytes
                                 
-                                print(LTConfigSampleRate)
                                 #create List of XL Rates to set
                                 XLSampleRates = [12.5, 25, 50, 100, 200, 400, 800, 1600] 
                                 GYSampleRates = [25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
@@ -346,14 +343,27 @@ class BallSpinnerController():
                                     self.smartDotHandlerThread.cancel()
 
                             case(MsgType.A_B_DISCONNECT_FROM_BSC):
+                                print("Server Disconnected")
                                 #Raise the BokenPipeError, as the Communication Line is disconnected
                                 raise BrokenPipeError
+                            case():
+                                print("Unknown Data: %s" % data[0])
                                 
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
+                    
+                    #If smartDot is connected, Disconnect
+                    if self.smartDot != None:
+                        print("Disconnecting from SmartDot")
+                        self.smartDot.disconnect()
                     raise BrokenPipeError
                 except Exception as e:
                     print(f"Error Occured Somewhere in BSC: {e}")
+
+                    #If smartDot is connected, Disconnect
+                    if self.smartDot != None:
+                        print("Disconnecting from SmartDot")
+                        self.smartDot.disconnect()
                     print("Restarting Pipe")
                     raise BrokenPipeError
             
@@ -390,10 +400,10 @@ class BallSpinnerController():
             i = 0
             while True: 
                 #update list every 5s
-                try:
-                    await asyncio.sleep(1.0)  
-                except asyncio.CancelledError:
-                    break
+                #try:
+                await asyncio.sleep(1.0)  
+                #except asyncio.CancelledError:
+                 #   break
 
                 #print all BLE devices found and append to connectable list                
                 count = 0
@@ -415,6 +425,7 @@ class BallSpinnerController():
                                         
                     bytesData.extend(name.encode("utf-8"))
                     self.commsChannel.send(bytesData)
+                    print("Sending")
                     
                 
 

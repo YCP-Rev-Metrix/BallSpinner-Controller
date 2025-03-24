@@ -58,6 +58,7 @@ class BallSpinnerController():
         print("Debug Mode: ON") if self.debug else None 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+                self.server = s
                 s.connect(("8.8.8.8", 80))
                 ipAddr = s.getsockname()[0]
                 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -85,9 +86,18 @@ class BallSpinnerController():
     #         self.hmi = UI(self.shared_data)
     #         self.hmi.check_for_updates()
     #         self.hmi.run()
-
+    def stop_server(self):
+        print("########## Shutting down the BSC socket ##########")
+        self.server.shutdown(socket.SHUT_RDWR)
+        print("########## Closing the BSC server ##########")
+        self.server.close()
+    def check_shared_data(self, data):
+        print("checking shared data ##########")
+        if data["close_bsc"] is True:
+            self.stop_server()
     def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
+           
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -183,6 +193,7 @@ class BallSpinnerController():
     async def commsHandler(self):
             loop = asyncio.get_event_loop()
             while True:
+                
             #Read first message com
                 try:
                     data = await loop.run_in_executor(None, self.commsChannel.recv, 1024)
@@ -345,7 +356,6 @@ class BallSpinnerController():
                             case(MsgType.A_B_DISCONNECT_FROM_BSC):
                                 #Raise the BokenPipeError, as the Communication Line is disconnected
                                 raise BrokenPipeError
-                                
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
                     raise BrokenPipeError
@@ -353,6 +363,10 @@ class BallSpinnerController():
                     print(f"Error Occured Somewhere in BSC: {e}")
                     print("Restarting Pipe")
                     raise BrokenPipeError
+                #Try reading the dictionary here and acting on a change to maybe the stop_BSC value
+                # print(self.shared_data["close_bsc"]) 
+                # shared_data["close_bsc"] is True    
+
             
 
 

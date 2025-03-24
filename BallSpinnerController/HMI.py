@@ -22,6 +22,8 @@ class HMI:
         self.emergency_stop_clicks = 0
         self.is_emergency_stopped = False
 
+        self.bsc = None
+
 ################################################### Initialize UI ###################################################\
         self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
         self.root.geometry("800x480")
@@ -38,7 +40,7 @@ class HMI:
         self.frame = tk.Frame(self.root, bg=self.data["bg_color"])
         self.frame.pack(side="top", fill="both", expand=True)
 
-
+        self.protocol_history = {}
         self.title_label = self.build_title_label()
         self.e_frame, self.e_label = self.build_error_box()
         self.close_button = self.build_close_button()
@@ -50,21 +52,61 @@ class HMI:
         self.emergency_stop_button = self.create_emergency_stop_button()
         self.bsc_button = self.create_BSC_button()
         self.local_mode_button = self.create_local_mode_button()
+        self.reset_button = self.create_reset_button()
         #List of elements to initially hide
-        self.initial_ui_elements_to_hide = {self.ip_label, self.mode_label, self.message_label, self.emergency_stop_button, self.sd_window, self.motor_buttons}
+
+
+        self.all_ui_elements = [
+            self.title_label,
+            self.e_frame, self.e_label,
+            self.close_button,
+            self.ip_label, self.mode_label, self.message_label,
+            self.motor_buttons, self.motor_popup, self.sd_window,
+            self.emergency_stop_button, self.bsc_button,
+            self.local_mode_button, self.reset_button
+        ]
+        
+        #Initialize the lists with 
+        self.hidden_ui_elements = [self.ip_label, self.mode_label, self.message_label, self.emergency_stop_button, self.sd_window, self.motor_buttons]
+        self.shown_ui_elements = []
+        self.shown_ui_elements = [element for element in self.all_ui_elements if element not in self.hidden_ui_elements]
+       # print(f"SHOWN UI ELEMENTS: {self.shown_ui_elements}")
+       # print(f"HIDDEN UI ELEMENTS: {self.hidden_ui_elements}")
+
+         
+        self.initial_ui_elements_to_hide = self.hidden_ui_elements
+        self.initial_ui_elements_to_show = self.shown_ui_elements
         self.hide_ui_elements(self.initial_ui_elements_to_hide)
         
 
-################################################### Utility Functions ################################################### 
+################################################### UI Utility Functions ################################################### 
     def hide_ui_elements(self, ui_element_list):
         for e in ui_element_list:
             e.lower(self.frame)#pass in root frame
     def show_ui_elements(self, ui_element_list):
          for e in ui_element_list:
             e.lift(self.frame)
-            
-    #TODO: function for back button from main local or bsc screen         
-    def reset_to_init_state(self):
+    
+    #def change_page()
+    def previous_page(self):
+        show_elements = self.hidden_ui_elements
+        self.hidden_ui_elements = self.shown_ui_elements
+        self.shown_ui_elements = show_elements
+        self.show_ui_elements(show_elements)
+        self.hide_ui_elements(self.hidden_ui_elements)
+        hide_elements = self
+
+        return ui_elements
+    
+    def full_reset_ui(self):
+        print("RESET UI")
+        # self.previous_page()
+        self.reset_bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
+        self.hide_ui_elements(self.reset_bsc_ui_elements_to_show)
+        self.bsc_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
+        self.show_ui_elements(self.bsc_ui_elements_to_hide)
+    #Change page
+    def change_page(self, ui_element_list_to_show):
         pass
 ################################################### Initialize Loops ###################################################\
     def run(self):
@@ -114,6 +156,7 @@ class HMI:
         e_text.pack()
         return e_frame, e_text
 
+################################################### Protocol History popup ###################################################
 
 ################################################### Motor Data popup ###################################################
     def create_motor_popup(self):
@@ -187,11 +230,14 @@ class HMI:
         return sd_frame
 
 ################################################### Create Buttons ###################################################
-
+    def create_reset_button(self):
+        reset_button = tk.Button(self.root, text="Back", command=self.reset_to_init_state)
+        reset_button.pack(in_=self.frame, side='top', anchor="nw")
+        return reset_button
     # Create a button to close the window
     def build_close_button(self):
         close_button = tk.Button(self.root, text="Close", command=self.close_window)
-        close_button.pack(side='bottom', pady=5)
+        close_button.pack(in_=self.frame, side='bottom', pady=5)
         return close_button
 
     #create button for starting local mode
@@ -285,10 +331,19 @@ class HMI:
         self.root.destroy()
         # Set the error text and update the error label
 
+    #TODO: function for back button from main local or bsc screen    
+    # Hide necessary UI elements. 
+    # If back to Mode selection screen:     Close server connection if open     
+    def reset_to_init_state(self):
+        self.data["close_bsc"] = True
+        self.full_reset_ui()
+        
+
+
 ################################################### Initialize BSC ###################################################
     
     def BSC(self):
-        BallSpinnerController.BallSpinnerController(self.data)
+        self.bsc = BallSpinnerController.BallSpinnerController(self.data)
     def launch_BSC_thread_from_HMI(self):
         if(self.data["can_launch_BSC"] == True):
             print("The HMI is starting the BSC")
@@ -297,6 +352,7 @@ class HMI:
             bsc_thread.start()
             # print("BSC server thread joining main thread")
             # bsc_thread.join()
+            print("Printing bsc ", self.bsc)
         else:
             print("Could not start BSC, must set data['can_launch_BSC'] to true")
 
@@ -332,6 +388,7 @@ def run_ui(shared_data):
 if __name__ == "__main__":
     shared_data = {
             "can_launch_BSC": False,
+            "close_bsc":False,
             "ip": "",
             "name": "",
             "xl": "",

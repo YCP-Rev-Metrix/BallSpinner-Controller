@@ -10,6 +10,7 @@ from .SmartDotEmulator import SmartDotEmulator
 from .iSmartDot import iSmartDot
 from .Motor import Motor
 from .StepperMotor import StepperMotor
+from .AuxSensors import AuxSensorSimulator
 import socket
 import struct
 import sys
@@ -43,7 +44,7 @@ class BallSpinnerController():
         try:
             #Manually Raise Permissiosn, if Possible
             subprocess.check_call(['sudo', '-n', 'true'])
-        
+    
         except subprocess.CalledProcessError: #If not possible to run with admin permissions, 
             raise PermissionError("Application Must Be Ran with Raised Permissions")
 
@@ -103,6 +104,7 @@ class BallSpinnerController():
             self.commsChannel, clientIp  = self.commsPort.accept()
             self.commsChannel.setblocking(True)
             try:
+                #Sorry Brandon -Robert
                 asyncio.run(self.commsHandler()) 
 
             except OSError: #Raised if Comms is forcibly closed while waiting for message
@@ -313,6 +315,9 @@ class BallSpinnerController():
                                     self.secMotor1.turnOnMotor(0)
                                     self.secMotor2.turnOnMotor(0)
 
+                                    #turn on Sensors
+                                    #self.sensor1 = AuxSensorSim()
+                                    self.sensorHandlerThread = asyncio.create_task(self.sensorHandler())    
                                     self.mode = BSCModes.TAKING_SHOT_DATA
                                 
                                 primMotorSpeed = struct.unpack('<f', data[3:7])[0]
@@ -367,6 +372,22 @@ class BallSpinnerController():
                     print("Restarting Pipe")
                     raise BrokenPipeError
             
+    async def sensorHandler(self):
+        print("Ploop")
+        motorEncoder = AuxSensorSimulator(None)
+        try:
+            while(True): #runs until Sensors are
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
+                
+                bytesData.extend(motorEncoder.readData()) 
+                print("Sending Sensor") 
+                asyncio.sleep(1)
+         
+        except asyncio.CancelledError: #Called when Sensor Thread is stopped
+            pass
+
+
 
 
     async def tCPscanAll(self, debugMode):
@@ -425,7 +446,6 @@ class BallSpinnerController():
                                         
                     bytesData.extend(name.encode("utf-8"))
                     self.commsChannel.send(bytesData)
-                    print("Sending")
                     
                 
 

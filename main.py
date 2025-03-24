@@ -35,6 +35,7 @@ class HMIThread(threading.Thread):
 if __name__ == "__main__":
     shared_data = {
             "can_launch_BSC": True,
+            "close_bsc":False,
             "ip": "",
             "port": "",
             "name": "",

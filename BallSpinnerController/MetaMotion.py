@@ -9,6 +9,7 @@ import struct
 from datetime import datetime
 import platform
 import sys
+import random
 
 from .iSmartDot import iSmartDot
 
@@ -52,6 +53,12 @@ class MetaMotion(iSmartDot):
             self.magCallback = FnVoid_VoidP_DataP(self.magDataHandler)
             self.gyroCallback = FnVoid_VoidP_DataP(self.gyroDataHandler)
             self.lightCallback = FnVoid_VoidP_DataP(self.lightDataHandler)
+
+            #I2C Reading setup
+            self.XL_ODR_Callback = FnVoid_VoidP_DataP(self.i2c_data_handler)
+            #0x68 is bmi270 i2c addr. 0x40 is odr register addr.
+            self.XL_ODR_parameters= I2cReadParameters(device_addr= 0x68, register_addr= 0x40)
+
 
             #set configurabe settings for each sensor's Rate and Range
             self.XL_availSampleRate = MetaMotion.XL_availSampleRate
@@ -199,6 +206,13 @@ class MetaMotion(iSmartDot):
     def disconnect(self):
         self.device.disconnect()
       
+    # Define a callback function to handle data
+    def i2c_data_handler(self, ctx, data):
+        data_obj = data.contents
+        print(f"Raw Data: {data_obj}")
+        print("Datadata%s -> %s &  %s" % (self.device.address, parse_value(data), data.contents))
+        #print("ur problem here bro")DatadataC8:30:26:28:92:4A -> [] &  {epoch : 1742670940955, extra : 4108379404, value : 4098885936, type_id : 4, length : 0}
+    
     def startAccel(self):
         
         print("Configuring Accelerometer")
@@ -217,9 +231,15 @@ class MetaMotion(iSmartDot):
         
         if(self.accelSignal != None):
             libmetawear.mbl_mw_acc_start(self.device.board)
+            # self.i2c_signal = libmetawear.mbl_mw_i2c_get_data_signal(self.device.board, 1, 0xA)
+            # libmetawear.mbl_mw_datasignal_subscribe(self.i2c_signal, None, self.XL_ODR_Callback)
+            # print("Now reading data signal with parameters")
+            # libmetawear.mbl_mw_datasignal_read_with_parameters(self.i2c_signal, byref(self.XL_ODR_parameters))
         else:
             print("Unable to Start Polling Data: Acceleration Not Enabled")
         self.AccelSampleCount = 0
+
+       
 
     def stopAccel(self):
         print("Stopping acceleration sampling")

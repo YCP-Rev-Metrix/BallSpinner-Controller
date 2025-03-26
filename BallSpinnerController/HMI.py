@@ -2,6 +2,8 @@ import tkinter as tk
 import threading
 from BallSpinnerController import BallSpinnerController
 from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
+import random
+import queue
 class HMI:
     def __init__(self, data):
         
@@ -91,6 +93,8 @@ class HMI:
             self.sd_window,
             self.show_protocol_button,
             self.motor_buttons,
+            self.reset_button,
+
         ]
         self.shown_ui_elements = [
             self.title_label,
@@ -99,7 +103,6 @@ class HMI:
             self.close_button,
             self.bsc_button,
             self.local_mode_button, 
-            self.reset_button,
             self.motor_popup
         ]
         self.button_toggleable_elements = [
@@ -119,6 +122,8 @@ class HMI:
         
 
 ################################################### UI Utility Functions ################################################### 
+   
+   #CONSIDER TRY CATCHING EACH attempt
     def hide_ui_elements(self, ui_element_list):
         for e in ui_element_list:
             e.lower(self.frame)#pass in root frame
@@ -171,26 +176,22 @@ class HMI:
 
         for label, new_text in updates.items():
             if label.cget("text") != new_text:
-                #If the label is the protocol message label, we will record the old message into the protocol_history list 
-                if label == self.message_label:
-                    self.protocol_history_list.append(new_text)
-                    self.protocol_history_window.pack_forget()
-                    self.protocol_history_window = self.create_protocol_history_window()
-
                 label.config(text=new_text)
-                
-    
+        
+        #Iterate through the protocol queue and write the messages to the history.
+        while not self.data["protocol_queue"].empty():
+            self.update_protocol_list(self.data["protocol_queue"].get())
 
         self.root.after(self.ui_update_frequency, self.check_for_updates)
 
 ################################################### Basic Data Labels ###################################################
     def build_mode_and_message_labels(self):
         # First label
-        label1 = tk.Label(self.root, text="Mode: ", bg="lightgray", padx=10, pady=5)
+        label1 = tk.Label(self.root, text="Mode: ", bg="lightgray", padx=10, pady=5,borderwidth=1, relief="solid")
         label1.place(in_=self.frame, relx=.05, rely=.4)  # Place on the left side with a bit of padding
 
         # Second label
-        label2 = tk.Label(self.root, text="", bg="lightgray", padx=10, pady=5, width=20)
+        label2 = tk.Label(self.root, text="", bg="lightgray", padx=10, pady=5, width=20, borderwidth=1, relief="solid")
         label2.place(in_=self.frame, relx=.05, rely=.5)  # Place it right below the first label with some vertical space
 
         return label1, label2
@@ -219,31 +220,29 @@ class HMI:
 ################################################### Protocol History popup ###################################################
     def create_protocol_history_window(self):
         sbf = ScrollbarFrame(self.root)
-        sbf.pack(in_=self.frame, )
+        sbf.pack(in_=self.frame,)
         sbf_frame = sbf.scrolled_frame
-        # history_frame = tk.Frame(self.root, padx=4,pady=4) #borderwidth=2, relief="ridge")
-        # history_frame.pack(in_=self.frame, anchor="center")
-        # self.protocol_history_list.extend([
-        #         "Apples", "Bananas", "A_B_START_UR_BOWNLING_BALLS", "Who",
-        #         "Let", "A_B_START_UR_BOWNLING_BALLS", "The", "Dogs",
-        #         "A_B_START_UR_BOWNLING_BALLS", "Out", "????????????", "A_B_START_UR_BOWNLING_BALLS","a", "b","c","d"
-        # ])
-        #Configure the grid
-        # count = 0
-        # for i in self.protocol_history_list:
-        #     history_frame.grid_rowconfigure(count, weight=1)
-        #     count =+ 1
-        # history_frame.grid_columnconfigure(0,weight=1)
-        #Draw the labels!
         count = 0
+        self.protocol_labels = []
         for i in self.protocol_history_list:
-            tk.Label(sbf_frame, text=f"{len(self.protocol_history_list)-count}: {self.protocol_history_list[len(self.protocol_history_list)-count - 1]}",
-                    width = 50, anchor="w", borderwidth="1", relief="solid") \
-                .grid(row=count, column=0)
-            # label = tk.Label(history_frame, text=f"{len(self.protocol_history_list)-count}: {i}", bg='white', fg='black', width = 50, anchor="w", borderwidth=1, relief="solid", pady=1)
-            #label.grid(in_=history_frame, row=count, column=0)
+            label = tk.Label(sbf_frame, text=f"{len(self.protocol_history_list)-count}: {self.protocol_history_list[len(self.protocol_history_list)-count - 1]}",
+                    width = 50, anchor="w", borderwidth="1", relief="solid") 
+            label.grid(row=count, column=0)
             count += 1
+            self.protocol_labels.append(label)
         return sbf
+    def update_protocol_list(self, new_text):
+        self.protocol_history_list.append(new_text)
+        #Remove labels
+        for i in self.protocol_labels:
+            new_row = i.grid_info()['row'] + 1
+            i.grid(row=new_row)
+        label = tk.Label(self.protocol_history_window.scrolled_frame, text=f"{len(self.protocol_history_list)}: {new_text}",
+                    width = 50, anchor="w", borderwidth="1", relief="solid") 
+        label.grid(row=0, column=0) 
+        self.protocol_labels.append(label)
+
+
 ################################################### Motor Data popup ###################################################
     def create_motor_popup(self):
         """Creates an embedded popup frame that appears inside the UI."""
@@ -251,6 +250,7 @@ class HMI:
 
         # Labels inside the popup
         self.popup_title = tk.Label(popup_frame, text="Motor Details", font=("Arial", 14, "bold"), bg="lightgray")
+        self.popup_current = tk.Label(popup_frame, text="", bg="lightgray")
         self.popup_speed = tk.Label(popup_frame, text="", bg="lightgray")
         self.popup_temp = tk.Label(popup_frame, text="", bg="lightgray")
         self.popup_status = tk.Label(popup_frame, text="", bg="lightgray")
@@ -259,9 +259,10 @@ class HMI:
         self.close_button = tk.Button(popup_frame, text="Close", command=self.hide_popup)
 
         # Pack elements inside the popup frame
-        self.popup_title.pack(in_=popup_frame, pady=5)
+        self.popup_title.pack(in_=popup_frame,)
         self.popup_speed.pack(in_=popup_frame,)
         self.popup_temp.pack(in_=popup_frame,)
+        self.popup_current.pack(in_=popup_frame,pady=5)
         self.popup_status.pack(in_=popup_frame,)
         self.close_button.pack(in_=popup_frame, pady=5)
         return popup_frame        
@@ -275,6 +276,7 @@ class HMI:
 
     def show_popup(self, motor_id):
         """Updates and displays the popup with motor details."""
+        self.popup_current.config(text=f"Current: {self.data['motor_currents'][motor_id]}A")
         self.popup_title.config(text=f"Motor {motor_id} Details")
         self.popup_speed.config(text=f"Speed: {100 + motor_id * 10} RPM")
         self.popup_temp.config(text=f"Temperature: {40 + motor_id}°C")
@@ -318,7 +320,7 @@ class HMI:
 ################################################### Create Buttons ###################################################
     def create_reset_button(self):
         reset_button = tk.Button(self.root, text="Back", command=self.reset_to_init_state)
-        reset_button.pack(in_=self.frame, side='top', anchor="nw")
+        reset_button.place(in_=self.frame,relx=0.05,rely=0.05)
         return reset_button
     # Create a button to close the window
     def build_close_button(self):
@@ -353,7 +355,7 @@ class HMI:
 
     ####### Button to open the protocol history #######
     def create_protocol_history_button(self):
-        button = tk.Button(self.root, text="Open Protocol History", bg="white", command=self.show_protocol_history)
+        button = tk.Button(self.root, text="Open Protocol History", bg="white", command=self.show_protocol_history, width=20)
         button.place(in_=self.frame, relx=.05, rely=.6)  # Place it right below the first label with some vertical space
         return button
 
@@ -438,6 +440,8 @@ class HMI:
         else:
             self.hide_ui_elements(l)
             self.is_protocol_visible = False
+        
+        #self.update_protocol_list(f"{random.randint(0,10)}")
 
 
 

@@ -18,6 +18,8 @@ from time import sleep
 from enum import Enum
 from.Protocol import *
 from .HMI import HMI
+import queue
+
 # class syntax
 class BSCModes(Enum):
     STARTUP = 0
@@ -85,14 +87,17 @@ class BallSpinnerController():
         self.server.shutdown(socket.SHUT_RDWR)
         print("########## Closing the BSC server ##########")
         self.server.close()
-    def check_shared_data(self, data):
-        print("checking shared data ##########")
-        if data["close_bsc"] is True:
-            self.stop_server()
+        #TODO Correctly shut down server, send an error message to BSA too.
+        #B_A_BSC_SHUTDOWN_BY_HMI
+    async def check_shared_data(self, data):
+        while True:
+            print("########## HMI Communication Occurring ##########")
+            if data["close_bsc"] is True:
+                self.stop_server()
+            await asyncio.sleep(1)
     
     async def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
-           
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -101,7 +106,7 @@ class BallSpinnerController():
             self.shared_data["ip"] = f"Socket: {ipAddr}:{8411}"
             print('Server listening on {}:{}'.format(*server_address))
             self.commsPort.bind(server_address)
-
+          
             #wait for a device to attempt TCP connection to Port
             self.commsPort.listen(1)
             self.commsChannel, clientIp  = self.commsPort.accept()
@@ -111,14 +116,14 @@ class BallSpinnerController():
                 self.startScanner = asyncio.Event()
                 self.startSmartDotHandler = asyncio.Event()
                 self.startSensorHandler = asyncio.Event()
-                self.checkHMIDict = asyncio.Event()
                 self.startScanner.clear()
+            
                 await asyncio.gather(
                     self.tCPscanAll(self.debug),
                     self.commsHandler(),
-                    self.smartDotHandler()
+                    self.smartDotHandler(),
+                    self.check_shared_data(self.shared_data)
                 )
-
             except OSError: #Raised if Comms is forcibly closed while waiting for message
                 print("Socket Closed, must restart")   
                 self.commsChannel.close()
@@ -200,7 +205,9 @@ class BallSpinnerController():
         
                     print("Received: %s" % data.hex())  if self.debug else None
                     #Pass the last message to the HMI
-                    self.shared_data["message_type"] = MsgType.name_from_value(data[0])
+                    p_msg = MsgType.name_from_value(data[0])
+                    self.shared_data["message_type"] = p_msg
+                    self.shared_data["protocol_queue"].put(p_msg)
                     
                     match data[0]: 
                         #shared_data["message_type"] =

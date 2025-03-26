@@ -2,6 +2,7 @@ from BallSpinnerController.BallSpinnerController import BallSpinnerController
 from BallSpinnerController.HMI import * 
 import sys
 import threading
+import queue
 
 def BSC_thread():
     if len(sys.argv) > 1:
@@ -34,6 +35,8 @@ class HMIThread(threading.Thread):
 
 if __name__ == "__main__":
     shared_data = {
+            "protocol_queue": queue.Queue(),
+            "motor_currents": [0,0,0],
             "can_launch_BSC": True,
             "close_bsc":False,
             "ip": "",

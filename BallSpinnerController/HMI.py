@@ -1,6 +1,7 @@
 import tkinter as tk
 import threading
 from BallSpinnerController import BallSpinnerController
+from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
 class HMI:
     def __init__(self, data):
         
@@ -40,7 +41,6 @@ class HMI:
         self.frame = tk.Frame(self.root, bg=self.data["bg_color"])
         self.frame.pack(side="top", fill="both", expand=True)
 
-        self.protocol_history = {}
         self.title_label = self.build_title_label()
         self.e_frame, self.e_label = self.build_error_box()
         self.close_button = self.build_close_button()
@@ -53,30 +53,69 @@ class HMI:
         self.bsc_button = self.create_BSC_button()
         self.local_mode_button = self.create_local_mode_button()
         self.reset_button = self.create_reset_button()
+
+        self.protocol_history_list = []
+        self.protocol_history_window = self.create_protocol_history_window()
+        self.show_protocol_button = self.create_protocol_history_button()
         #List of elements to initially hide
 
 
         self.all_ui_elements = [
             self.title_label,
-            self.e_frame, self.e_label,
+            self.e_frame, 
+            self.e_label,
             self.close_button,
-            self.ip_label, self.mode_label, self.message_label,
-            self.motor_buttons, self.motor_popup, self.sd_window,
-            self.emergency_stop_button, self.bsc_button,
-            self.local_mode_button, self.reset_button
+            self.ip_label, 
+            self.mode_label, 
+            self.message_label,
+            self.motor_buttons, 
+            self.motor_popup, 
+            self.sd_window,
+            self.emergency_stop_button, 
+            self.bsc_button,
+            self.local_mode_button, 
+            self.reset_button,
+            self.protocol_history_window,
+            self.show_protocol_button,
         ]
+
+        self.is_element_showing_list = []
+        self.is_protocol_visible = False
         
         #Initialize the lists with 
-        self.hidden_ui_elements = [self.ip_label, self.mode_label, self.message_label, self.emergency_stop_button, self.sd_window, self.motor_buttons]
-        self.shown_ui_elements = []
-        self.shown_ui_elements = [element for element in self.all_ui_elements if element not in self.hidden_ui_elements]
+        self.hidden_ui_elements = [
+            self.ip_label,
+            self.mode_label,
+            self.message_label,
+            self.emergency_stop_button,
+            self.sd_window,
+            self.show_protocol_button,
+            self.motor_buttons,
+        ]
+        self.shown_ui_elements = [
+            self.title_label,
+            self.e_frame, 
+            self.e_label,
+            self.close_button,
+            self.bsc_button,
+            self.local_mode_button, 
+            self.reset_button,
+            self.motor_popup
+        ]
+        self.button_toggleable_elements = [
+            self.protocol_history_window,
+        ]
+
+        #self.shown_ui_elements = [element for element in self.all_ui_elements if element not in self.hidden_ui_elements]
        # print(f"SHOWN UI ELEMENTS: {self.shown_ui_elements}")
        # print(f"HIDDEN UI ELEMENTS: {self.hidden_ui_elements}")
 
-         
+    
         self.initial_ui_elements_to_hide = self.hidden_ui_elements
         self.initial_ui_elements_to_show = self.shown_ui_elements
         self.hide_ui_elements(self.initial_ui_elements_to_hide)
+        self.hide_ui_elements(self.button_toggleable_elements)
+
         
 
 ################################################### UI Utility Functions ################################################### 
@@ -87,14 +126,25 @@ class HMI:
          for e in ui_element_list:
             e.lift(self.frame)
     
-    #def change_page()
+    #Ideas for a modular page changer/good back button
+    #We would want a way to track the different visibile commands we call.
+    # a STACK! of lists of previously shown arrays
+
+    # Stack of previously_shown_elements[] lists
+    # list for most_recently_shown_elements[]
+
+    # Back button: 
+    # Pop top most stack element. Make the elements from this pop as visible. 
+    # What do we hide? most_recently_shown_elements. 
+    # Set recently_shown_elements to the popped list.
+    # IF our popped list is = to initial HMI element list, then this means we need to shutdown server and whatever else and enter reset state
     def previous_page(self):
         show_elements = self.hidden_ui_elements
         self.hidden_ui_elements = self.shown_ui_elements
         self.shown_ui_elements = show_elements
         self.show_ui_elements(show_elements)
         self.hide_ui_elements(self.hidden_ui_elements)
-        hide_elements = self
+        hide_elements = selfs
 
         return ui_elements
     
@@ -121,7 +171,15 @@ class HMI:
 
         for label, new_text in updates.items():
             if label.cget("text") != new_text:
+                #If the label is the protocol message label, we will record the old message into the protocol_history list 
+                if label == self.message_label:
+                    self.protocol_history_list.append(new_text)
+                    self.protocol_history_window.pack_forget()
+                    self.protocol_history_window = self.create_protocol_history_window()
+
                 label.config(text=new_text)
+                
+    
 
         self.root.after(self.ui_update_frequency, self.check_for_updates)
 
@@ -132,7 +190,7 @@ class HMI:
         label1.place(in_=self.frame, relx=.05, rely=.4)  # Place on the left side with a bit of padding
 
         # Second label
-        label2 = tk.Label(self.root, text="Last Message Received: ", bg="lightgray", padx=10, pady=5)
+        label2 = tk.Label(self.root, text="", bg="lightgray", padx=10, pady=5, width=20)
         label2.place(in_=self.frame, relx=.05, rely=.5)  # Place it right below the first label with some vertical space
 
         return label1, label2
@@ -156,8 +214,36 @@ class HMI:
         e_text.pack()
         return e_frame, e_text
 
+        # sbf = ScrollbarFrame(self.root)
+        # sbf.pack(in_=self.frame, anchor="center")
 ################################################### Protocol History popup ###################################################
-
+    def create_protocol_history_window(self):
+        sbf = ScrollbarFrame(self.root)
+        sbf.pack(in_=self.frame, )
+        sbf_frame = sbf.scrolled_frame
+        # history_frame = tk.Frame(self.root, padx=4,pady=4) #borderwidth=2, relief="ridge")
+        # history_frame.pack(in_=self.frame, anchor="center")
+        # self.protocol_history_list.extend([
+        #         "Apples", "Bananas", "A_B_START_UR_BOWNLING_BALLS", "Who",
+        #         "Let", "A_B_START_UR_BOWNLING_BALLS", "The", "Dogs",
+        #         "A_B_START_UR_BOWNLING_BALLS", "Out", "????????????", "A_B_START_UR_BOWNLING_BALLS","a", "b","c","d"
+        # ])
+        #Configure the grid
+        # count = 0
+        # for i in self.protocol_history_list:
+        #     history_frame.grid_rowconfigure(count, weight=1)
+        #     count =+ 1
+        # history_frame.grid_columnconfigure(0,weight=1)
+        #Draw the labels!
+        count = 0
+        for i in self.protocol_history_list:
+            tk.Label(sbf_frame, text=f"{len(self.protocol_history_list)-count}: {self.protocol_history_list[len(self.protocol_history_list)-count - 1]}",
+                    width = 50, anchor="w", borderwidth="1", relief="solid") \
+                .grid(row=count, column=0)
+            # label = tk.Label(history_frame, text=f"{len(self.protocol_history_list)-count}: {i}", bg='white', fg='black', width = 50, anchor="w", borderwidth=1, relief="solid", pady=1)
+            #label.grid(in_=history_frame, row=count, column=0)
+            count += 1
+        return sbf
 ################################################### Motor Data popup ###################################################
     def create_motor_popup(self):
         """Creates an embedded popup frame that appears inside the UI."""
@@ -265,7 +351,12 @@ class HMI:
         button.place(in_=self.frame, x=position_left + 150, y=position_top, width=btn_width, height=btn_height)
         return button
 
-        
+    ####### Button to open the protocol history #######
+    def create_protocol_history_button(self):
+        button = tk.Button(self.root, text="Open Protocol History", bg="white", command=self.show_protocol_history)
+        button.place(in_=self.frame, relx=.05, rely=.6)  # Place it right below the first label with some vertical space
+        return button
+
     ####### Grid of Motor Toggle Buttons #######
     def create_motor_buttons_grid(self): 
         #Create Grid in center to place motor name Buttons 
@@ -338,6 +429,16 @@ class HMI:
         self.data["close_bsc"] = True
         self.full_reset_ui()
         
+    def show_protocol_history(self):
+        l = [self.protocol_history_window]
+
+        if not self.is_protocol_visible:
+            self.show_ui_elements(l)
+            self.is_protocol_visible = True
+        else:
+            self.hide_ui_elements(l)
+            self.is_protocol_visible = False
+
 
 
 ################################################### Initialize BSC ###################################################
@@ -362,6 +463,9 @@ class HMI:
 
         self.bsc_ui_elements_to_hide = {self.bsc_button, self.local_mode_button}
         self.hide_ui_elements(self.bsc_ui_elements_to_hide)
+
+        # #this is actually a toggle
+        # self.show_protocol_history()
 
 ################################################### Initialize Local Mode ###################################################
     def launch_local_mode(self):

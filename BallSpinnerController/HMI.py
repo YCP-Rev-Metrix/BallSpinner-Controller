@@ -1,108 +1,271 @@
 import tkinter as tk
-
-class UI:
+import threading
+from BallSpinnerController import BallSpinnerController
+from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
+import random
+import queue
+class HMI:
     def __init__(self, data):
+        
+        #This is our shared data dictionary that we check for changes in 
         self.data = data
-        self.ui_update_frequency = 200  # Update the UI every 200 milliseconds
-        self.root = tk.Tk()
-        self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
-        self.root.geometry("800x480")
-        self.root.title("Ball Spinner HMI")
-        self.root.configure(bg=data["bg_color"])  # Set the background color of the window
+        
+        # How fast we check shared data dictionary to update values in the UI 
+        self.ui_update_frequency = 200  
+        
+        #This try catch is for the automatic headless display when we fail to open HMI (most likely to occur on unsetup SSH see BWoodward Spring Journal 2025)
+        try:
+            self.root = tk.Tk()
+        except Exception as e:
+            print(e)
+            pass
+
+################################################### Function variables ###################################################\
         self.active_motor = None  # Track which motor's popup is active
         self.emergency_stop_clicks = 0
         self.is_emergency_stopped = False
-        # Build the UI components
+
+        self.bsc = None
+
+################################################### Initialize UI ###################################################\
+        self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
+        self.root.geometry("800x480")
+        self.screen_width = 800
+        self.screen_height = 480
+        
+        self.root.title("Ball Spinner HMI")
+        self.root.configure(bg=self.data["bg_color"])  # Set the background color of the window
+
+        #Create root frame
+        #Purpose of this frame is to create a widget that everything is in. This way we can lift(self.frame) or lower(self.frame) to hide or show widgets.
+        #When making children widgets and placing them using place(), grid(), or pack() make sure to include (in_=self.frame)
+        ## IF making elements inside another frame ELSEWHERE: new_frame.pack(in_=self.frame) and children use in_=new_frame 
+        self.frame = tk.Frame(self.root, bg=self.data["bg_color"])
+        self.frame.pack(side="top", fill="both", expand=True)
+
         self.title_label = self.build_title_label()
         self.e_frame, self.e_label = self.build_error_box()
         self.close_button = self.build_close_button()
         self.ip_label = self.build_ip_port_text()
         self.mode_label, self.message_label = self.build_mode_and_message_labels()
-        self.create_grid()
-        self.create_motor_popup()
-        self.create_SD_window()
-        self.create_emergency_stop_button()
+        self.motor_buttons = self.create_motor_buttons_grid()
+        self.motor_popup = self.create_motor_popup()
+        self.sd_window = self.create_SD_window()
+        self.emergency_stop_button = self.create_emergency_stop_button()
+        self.bsc_button = self.create_BSC_button()
+        self.local_mode_button = self.create_local_mode_button()
+        self.reset_button = self.create_reset_button()
+
+        self.protocol_history_list = []
+        self.protocol_history_window = self.create_protocol_history_window()
+        self.show_protocol_button = self.create_protocol_history_button()
+        #List of elements to initially hide
 
 
+        self.all_ui_elements = [
+            self.title_label,
+            self.e_frame, 
+            self.e_label,
+            self.close_button,
+            self.ip_label, 
+            self.mode_label, 
+            self.message_label,
+            self.motor_buttons, 
+            self.motor_popup, 
+            self.sd_window,
+            self.emergency_stop_button, 
+            self.bsc_button,
+            self.local_mode_button, 
+            self.reset_button,
+            self.protocol_history_window,
+            self.show_protocol_button,
+        ]
 
+        self.is_element_showing_list = []
+        self.is_protocol_visible = False
+        
+        #Initialize the lists with 
+        self.hidden_ui_elements = [
+            self.ip_label,
+            self.mode_label,
+            self.message_label,
+            self.emergency_stop_button,
+            self.sd_window,
+            self.show_protocol_button,
+            self.motor_buttons,
+            self.reset_button,
+
+        ]
+        self.shown_ui_elements = [
+            self.title_label,
+            self.e_frame, 
+            self.e_label,
+            self.close_button,
+            self.bsc_button,
+            self.local_mode_button, 
+            self.motor_popup
+        ]
+        self.button_toggleable_elements = [
+            self.protocol_history_window,
+        ]
+
+        #self.shown_ui_elements = [element for element in self.all_ui_elements if element not in self.hidden_ui_elements]
+       # print(f"SHOWN UI ELEMENTS: {self.shown_ui_elements}")
+       # print(f"HIDDEN UI ELEMENTS: {self.hidden_ui_elements}")
+
+    
+        self.initial_ui_elements_to_hide = self.hidden_ui_elements
+        self.initial_ui_elements_to_show = self.shown_ui_elements
+        self.hide_ui_elements(self.initial_ui_elements_to_hide)
+        self.hide_ui_elements(self.button_toggleable_elements)
+
+        
+
+################################################### UI Utility Functions ################################################### 
+   
+   #CONSIDER TRY CATCHING EACH attempt
+    def hide_ui_elements(self, ui_element_list):
+        for e in ui_element_list:
+            e.lower(self.frame)#pass in root frame
+    def show_ui_elements(self, ui_element_list):
+         for e in ui_element_list:
+            e.lift(self.frame)
+    
+    #Ideas for a modular page changer/good back button
+    #We would want a way to track the different visibile commands we call.
+    # a STACK! of lists of previously shown arrays
+
+    # Stack of previously_shown_elements[] lists
+    # list for most_recently_shown_elements[]
+
+    # Back button: 
+    # Pop top most stack element. Make the elements from this pop as visible. 
+    # What do we hide? most_recently_shown_elements. 
+    # Set recently_shown_elements to the popped list.
+    # IF our popped list is = to initial HMI element list, then this means we need to shutdown server and whatever else and enter reset state
+    def previous_page(self):
+        show_elements = self.hidden_ui_elements
+        self.hidden_ui_elements = self.shown_ui_elements
+        self.shown_ui_elements = show_elements
+        self.show_ui_elements(show_elements)
+        self.hide_ui_elements(self.hidden_ui_elements)
+        hide_elements = selfs
+
+        return ui_elements
+    
+    def full_reset_ui(self):
+        print("RESET UI")
+        # self.previous_page()
+        self.reset_bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
+        self.hide_ui_elements(self.reset_bsc_ui_elements_to_show)
+        self.bsc_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
+        self.show_ui_elements(self.bsc_ui_elements_to_hide)
+    #Change page
+    def change_page(self, ui_element_list_to_show):
+        pass
+################################################### Initialize Loops ###################################################\
     def run(self):
         self.root.mainloop()
 
-    #This is our loop for updating data within the HMI. It checks for changes in the shared dictionary that both the BSC and HMI have.
     def check_for_updates(self):
-        if self.data["error_text"] != self.e_label.cget("text"):
-            self.e_label.config(text=self.data["error_text"])
-        if self.data["ip"] != self.ip_label.cget("text"):
-            self.ip_label.config(text=self.data["ip"])
-        if self.data["message_type"] != self.message_label.cget("text"):
-            self.message_label.config(text=self.data["message_type"])
+        updates = {
+            self.e_label: self.data["error_text"],
+            self.ip_label: self.data["ip"],
+            self.message_label: self.data["message_type"]
+        }
 
-        #Cause this function to call itself, recurring with ui_update_frequency in ms.
-        self.root.after(self.ui_update_frequency, self.check_for_updates)  # Check every 1000 milliseconds (1 second)
+        for label, new_text in updates.items():
+            if label.cget("text") != new_text:
+                label.config(text=new_text)
+        
+        #Iterate through the protocol queue and write the messages to the history.
+        while not self.data["protocol_queue"].empty():
+            self.update_protocol_list(self.data["protocol_queue"].get())
 
-    def close_window(self):
-        self.root.destroy()
-        # Set the error text and update the error label
+        self.root.after(self.ui_update_frequency, self.check_for_updates)
 
+################################################### Basic Data Labels ###################################################
+    def build_mode_and_message_labels(self):
+        # First label
+        label1 = tk.Label(self.root, text="Mode: ", bg="lightgray", padx=10, pady=5,borderwidth=1, relief="solid")
+        label1.place(in_=self.frame, relx=.05, rely=.4)  # Place on the left side with a bit of padding
+
+        # Second label
+        label2 = tk.Label(self.root, text="", bg="lightgray", padx=10, pady=5, width=20, borderwidth=1, relief="solid")
+        label2.place(in_=self.frame, relx=.05, rely=.5)  # Place it right below the first label with some vertical space
+
+        return label1, label2
+
+    def build_ip_port_text(self):
+        label = tk.Label(self.root, text="Socket: 11.1.1.1.1:64920",  padx=10, pady=10)
+        label.pack(in_=self.frame, side='bottom')
+        return label
+   
     # Create a title "Ball Spinner Controller"
     def build_title_label(self):
         title = tk.Label(self.root, text="Ball Spinner Controller", bg=self.data["bg_color"])
-        title.pack(side='top', fill='both')
+        title.pack(in_=self.frame,side='top', fill='both')
         return title
 
     # Create the error frame and label
     def build_error_box(self):
         e_frame = tk.Frame(self.root, bg='gray')
-        e_frame.pack(side='top')
+        e_frame.pack(in_=self.frame, side='top')
         e_text = tk.Label(e_frame, text=f"Error: ", fg='red', width=50)
         e_text.pack()
         return e_frame, e_text
 
-    # Create a button to close the window
-    def build_close_button(self):
-        close_button = tk.Button(self.root, text="Close", command=self.close_window)
-        close_button.pack(side='bottom', pady=5)
-        return close_button
+        # sbf = ScrollbarFrame(self.root)
+        # sbf.pack(in_=self.frame, anchor="center")
+################################################### Protocol History popup ###################################################
+    def create_protocol_history_window(self):
+        sbf = ScrollbarFrame(self.root)
+        sbf.pack(in_=self.frame,)
+        sbf_frame = sbf.scrolled_frame
+        count = 0
+        self.protocol_labels = []
+        for i in self.protocol_history_list:
+            label = tk.Label(sbf_frame, text=f"{len(self.protocol_history_list)-count}: {self.protocol_history_list[len(self.protocol_history_list)-count - 1]}",
+                    width = 50, anchor="w", borderwidth="1", relief="solid") 
+            label.grid(row=count, column=0)
+            count += 1
+            self.protocol_labels.append(label)
+        return sbf
+    def update_protocol_list(self, new_text):
+        self.protocol_history_list.append(new_text)
+        #Remove labels
+        for i in self.protocol_labels:
+            new_row = i.grid_info()['row'] + 1
+            i.grid(row=new_row)
+        label = tk.Label(self.protocol_history_window.scrolled_frame, text=f"{len(self.protocol_history_list)}: {new_text}",
+                    width = 50, anchor="w", borderwidth="1", relief="solid") 
+        label.grid(row=0, column=0) 
+        self.protocol_labels.append(label)
 
-    def build_mode_and_message_labels(self):
-        # # Create a frame to hold the labels on the left
-        # left_frame = tk.Frame(self.root, bg=self.data["bg_color"])  # Optional background color for visibility
-        # left_frame.pack(side='left', padx=0, pady=20, anchor="nw")
 
-        # First label
-        label1 = tk.Label(self.root, text="Mode: ", bg="lightgray", padx=10, pady=5)
-        label1.place(relx=.05, rely=.4)  # Place on the left side with a bit of padding
-
-        # Second label
-        label2 = tk.Label(self.root, text="Last Message Received: ", bg="lightgray", padx=10, pady=5)
-        label2.place(relx=.05, rely=.5)  # Place it right below the first label with some vertical space
-
-        return label1, label2
-
-    def build_ip_port_text(self):
-        label = tk.Label(self.root, text="Socket: 11.1.1.1.1:612941",  padx=10, pady=10)
-        label.pack(side='bottom')
-        return label
-
+################################################### Motor Data popup ###################################################
     def create_motor_popup(self):
         """Creates an embedded popup frame that appears inside the UI."""
-        self.popup_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
+        popup_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
 
         # Labels inside the popup
-        self.popup_title = tk.Label(self.popup_frame, text="Motor Details", font=("Arial", 14, "bold"), bg="lightgray")
-        self.popup_speed = tk.Label(self.popup_frame, text="", bg="lightgray")
-        self.popup_temp = tk.Label(self.popup_frame, text="", bg="lightgray")
-        self.popup_status = tk.Label(self.popup_frame, text="", bg="lightgray")
+        self.popup_title = tk.Label(popup_frame, text="Motor Details", font=("Arial", 14, "bold"), bg="lightgray")
+        self.popup_current = tk.Label(popup_frame, text="", bg="lightgray")
+        self.popup_speed = tk.Label(popup_frame, text="", bg="lightgray")
+        self.popup_temp = tk.Label(popup_frame, text="", bg="lightgray")
+        self.popup_status = tk.Label(popup_frame, text="", bg="lightgray")
 
         # Close button (alternative way to close)
-        self.close_button = tk.Button(self.popup_frame, text="Close", command=self.hide_popup)
+        self.close_button = tk.Button(popup_frame, text="Close", command=self.hide_popup)
 
         # Pack elements inside the popup frame
-        self.popup_title.pack(pady=5)
-        self.popup_speed.pack()
-        self.popup_temp.pack()
-        self.popup_status.pack()
-        self.close_button.pack(pady=5)
+        self.popup_title.pack(in_=popup_frame,)
+        self.popup_speed.pack(in_=popup_frame,)
+        self.popup_temp.pack(in_=popup_frame,)
+        self.popup_current.pack(in_=popup_frame,pady=5)
+        self.popup_status.pack(in_=popup_frame,)
+        self.close_button.pack(in_=popup_frame, pady=5)
+        return popup_frame        
 
     def toggle_popup(self, motor_id):
         """Shows or hides the popup based on the button click."""
@@ -113,24 +276,94 @@ class UI:
 
     def show_popup(self, motor_id):
         """Updates and displays the popup with motor details."""
+        self.popup_current.config(text=f"Current: {self.data['motor_currents'][motor_id]}A")
         self.popup_title.config(text=f"Motor {motor_id} Details")
         self.popup_speed.config(text=f"Speed: {100 + motor_id * 10} RPM")
         self.popup_temp.config(text=f"Temperature: {40 + motor_id}°C")
         self.popup_status.config(text=f"Status: Running")
 
         # Place the popup in the UI
-        self.popup_frame.place(relx=0.5, rely=0.5, anchor="center")
+        self.motor_popup.place(in_=self.frame, relx=0.5, rely=0.5, anchor="center")
         self.active_motor = motor_id  # Store active motor
 
     def hide_popup(self):
         """Hides the popup."""
-        self.popup_frame.place_forget()
+        self.motor_popup.place_forget()
         self.active_motor = None  # Reset active motor
+    
 
-    def create_grid(self): 
-        """Creates a frame with buttons to open/hide the popup."""
+
+################################################### SD Data Display ###################################################
+    #Create the SD window on the right side of the UI
+    def create_SD_window(self):
+        sd_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
+
+        # Add labels inside the SD window
+        self.sd_title = tk.Label(sd_frame, text="SD Information", font=("Arial", 14, "bold"), bg="lightgray")
+        self.sd_xl = tk.Label(sd_frame, text="XL: --", bg="lightgray")
+        self.sd_gy = tk.Label(sd_frame, text="GY: --", bg="lightgray")
+        self.sd_mg = tk.Label(sd_frame, text="MG: --", bg="lightgray")
+        self.sd_lt = tk.Label(sd_frame, text="LT: --", bg="lightgray")
+
+        # Pack elements inside the SD window
+        self.sd_title.pack(pady=5)
+        self.sd_xl.pack(pady=5)
+        self.sd_gy.pack(pady=5)
+        self.sd_mg.pack(pady=5)
+        self.sd_lt.pack(pady=5)
+
+
+        # Place the SD window on the right side
+        sd_frame.place(relx=0.85, rely=0.5, anchor="center")
+        return sd_frame
+
+################################################### Create Buttons ###################################################
+    def create_reset_button(self):
+        reset_button = tk.Button(self.root, text="Back", command=self.reset_to_init_state)
+        reset_button.place(in_=self.frame,relx=0.05,rely=0.05)
+        return reset_button
+    # Create a button to close the window
+    def build_close_button(self):
+        close_button = tk.Button(self.root, text="Close", command=self.close_window)
+        close_button.pack(in_=self.frame, side='bottom', pady=5)
+        return close_button
+
+    #create button for starting local mode
+    def create_local_mode_button(self):
+        # Get the size of the button
+        btn_width = 150
+        btn_height = 100
+        
+        # Calculate position to center the button
+        position_top = self.screen_height // 2 - btn_height // 2
+        position_left = self.screen_width // 2 - btn_width // 2
+        button = tk.Button(self.root, text="Start Local Mode", bg="white", command=self.launch_local_mode)
+        button.place(in_=self.frame, x=position_left - 150, y=position_top, width=btn_width, height=btn_height)
+        return button
+    #create button for starting BSC server
+    def create_BSC_button(self):
+        # Get the size of the button
+        btn_width = 150
+        btn_height = 100
+        
+        # Calculate position to center the button
+        position_top = self.screen_height // 2 - btn_height // 2
+        position_left = self.screen_width // 2 - btn_width // 2
+        button = tk.Button(self.root, text="Start BSC Server", bg="white", command=self.launch_BSC_thread_from_HMI)
+        button.place(in_=self.frame, x=position_left + 150, y=position_top, width=btn_width, height=btn_height)
+        return button
+
+    ####### Button to open the protocol history #######
+    def create_protocol_history_button(self):
+        button = tk.Button(self.root, text="Open Protocol History", bg="white", command=self.show_protocol_history, width=20)
+        button.place(in_=self.frame, relx=.05, rely=.6)  # Place it right below the first label with some vertical space
+        return button
+
+    ####### Grid of Motor Toggle Buttons #######
+    def create_motor_buttons_grid(self): 
+        #Create Grid in center to place motor name Buttons 
         grid_frame = tk.Frame(self.root, bg=self.data["bg_color"])
-        grid_frame.pack(pady=20)
+        grid_frame.pack(in_=self.frame, pady=20)
 
         # Configure grid inside the frame
         for i in range(3):
@@ -142,34 +375,16 @@ class UI:
         for i in range(3):
             button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="lightblue", width=10, height=2,
                                command=lambda m=i+1: self.toggle_popup(m))
-            button.grid(row=0, column=i, padx=10, pady=10)
-
-    #Create the SD window on the right side of the UI
-    def create_SD_window(self):
-        self.sd_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
-
-        # Add labels inside the SD window
-        self.sd_title = tk.Label(self.sd_frame, text="SD Information", font=("Arial", 14, "bold"), bg="lightgray")
-        self.sd_xl = tk.Label(self.sd_frame, text="XL: --", bg="lightgray")
-        self.sd_gy = tk.Label(self.sd_frame, text="GY: --", bg="lightgray")
-        self.sd_mg = tk.Label(self.sd_frame, text="MG: --", bg="lightgray")
-        self.sd_lt = tk.Label(self.sd_frame, text="LT: --", bg="lightgray")
-
-        # Pack elements inside the SD window
-        self.sd_title.pack(pady=5)
-        self.sd_xl.pack(pady=5)
-        self.sd_gy.pack(pady=5)
-        self.sd_mg.pack(pady=5)
-        self.sd_lt.pack(pady=5)
-
-
-        # Place the SD window on the right side
-        self.sd_frame.place(relx=0.85, rely=0.5, anchor="center")
-
-    #Creates an emergency stop button in the bottom-left corner of the root window.
+            button.grid(in_=grid_frame, row=0, column=i, padx=10, pady=10)
+        return grid_frame
+           
+    
+       
+    ####### Emergency Stop Button #######
     def create_emergency_stop_button(self):
+        #Creates an emergency stop button in the bottom-left corner of the root window.
         bottom_left_button = tk.Button(self.root, text="EMERGENCY STOP MOTOR", bg="red", command=self.emergency_stop_click)
-        bottom_left_button.place(relx=0.05, rely=0.95, anchor="sw", width=200, height=50)
+        bottom_left_button.place(in_=self.frame, relx=0.05, rely=0.95, anchor="sw", width=200, height=50)
         
         # Bind events to track the press and release
         bottom_left_button.bind("<ButtonPress-1>", self.start_emergency_stop_timer)
@@ -177,7 +392,10 @@ class UI:
 
         # Variable to store the timer ID
         self.timer_id = None
+        return bottom_left_button
+        
 
+################################################### Timer Events ###################################################
     def start_emergency_stop_timer(self, event):
         """Starts the timer when the button is pressed and waits for 3 seconds."""
         # Start a 3-second timer (3000 milliseconds)
@@ -188,6 +406,8 @@ class UI:
         if self.timer_id and self.is_emergency_stopped == False:
             self.root.after_cancel(self.timer_id)  # Cancel the action if released early
             self.timer_id = None
+
+################################################### Button Functions ###################################################
 
     #Functionality of emergency stop
     def emergency_stop_click(self): ####TODO: Should add a timer to reset clicks to 0
@@ -200,17 +420,83 @@ class UI:
         self.is_emergency_stopped = True
         self.data["error_text"] = f"IMPLEMENT STOP OF MOTOR"
 
+    def close_window(self):
+        self.root.destroy()
+        # Set the error text and update the error label
+
+    #TODO: function for back button from main local or bsc screen    
+    # Hide necessary UI elements. 
+    # If back to Mode selection screen:     Close server connection if open     
+    def reset_to_init_state(self):
+        self.data["close_bsc"] = True
+        self.full_reset_ui()
+        
+    def show_protocol_history(self):
+        l = [self.protocol_history_window]
+
+        if not self.is_protocol_visible:
+            self.show_ui_elements(l)
+            self.is_protocol_visible = True
+        else:
+            self.hide_ui_elements(l)
+            self.is_protocol_visible = False
+        
+        #self.update_protocol_list(f"{random.randint(0,10)}")
 
 
+
+################################################### Initialize BSC ###################################################
+    
+    def BSC(self):
+        self.bsc = BallSpinnerController.BallSpinnerController(self.data)
+    def launch_BSC_thread_from_HMI(self):
+        if(self.data["can_launch_BSC"] == True):
+            print("The HMI is starting the BSC")
+            bsc_thread = threading.Thread(target=self.BSC)
+            print("Starting the BSC server thread")
+            bsc_thread.start()
+            # print("BSC server thread joining main thread")
+            # bsc_thread.join()
+            print("Printing bsc ", self.bsc)
+        else:
+            print("Could not start BSC, must set data['can_launch_BSC'] to true")
+
+        #Modify the current UI layout to fit the server mode.
+        self.bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
+        self.show_ui_elements(self.bsc_ui_elements_to_show)
+
+        self.bsc_ui_elements_to_hide = {self.bsc_button, self.local_mode_button}
+        self.hide_ui_elements(self.bsc_ui_elements_to_hide)
+
+        # #this is actually a toggle
+        # self.show_protocol_history()
+
+################################################### Initialize Local Mode ###################################################
+    def launch_local_mode(self):
+        self.bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
+        self.show_ui_elements(self.bsc_ui_elements_to_show)
+        self.bsc_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
+        self.hide_ui_elements(self.bsc_ui_elements_to_hide)
+
+
+
+
+################################################### Run as Main Testing (Local Only) ################################################### 
 def run_ui(shared_data):
-    ui = UI(shared_data)
-    ui.check_for_updates()
-    ui.run()
+    try:
+        ui = UI(shared_data)
+        ui.check_for_updates()
+        ui.run()
+    except:
+        print("The HMI does not have a display connected, running in headless mode.")
+        print("For information on how to open the HMI in SSH, view Brandon Woodward Spring25 Journal page 11")
 
 
 #run HMI.py to test it without connecting it to the server
 if __name__ == "__main__":
     shared_data = {
+            "can_launch_BSC": False,
+            "close_bsc":False,
             "ip": "",
             "name": "",
             "xl": "",

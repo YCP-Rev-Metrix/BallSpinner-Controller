@@ -63,6 +63,5 @@ class StepperMotor(iMotor):
     def rampUp():
         pass
 
-    def turnOffMotor():
-        pass
+   
 

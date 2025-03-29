@@ -120,13 +120,14 @@ class BallSpinnerController():
                 self.startScanner = asyncio.Event()
                 self.startSmartDotHandler = asyncio.Event()
                 self.startSensorHandler = asyncio.Event()
-                self.startScanner.clear()
-            
+                self.startSensorHandler= asyncio.Event()    
+
                 await asyncio.gather(
                     self.tCPscanAll(self.debug),
                     self.commsHandler(),
                     self.smartDotHandler(),
-                    self.check_shared_data(self.data)
+                    self.check_shared_data(self.data),
+                    self.sensorHandler()
                 )
             except OSError: #Raised if Comms is forcibly closed while waiting for message
                 print("Socket Closed, must restart")   
@@ -143,60 +144,63 @@ class BallSpinnerController():
                 pass
     
     async def smartDotHandler(self):
-        #Wait until Motor Instructions are first sent
+        while True: # Allow for thread to loop when repeated Start
 
-        await self.startSmartDotHandler.wait()
-        print("Handling SmartDot:")
-        def accelDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
-            bytesData.extend(dataBytes)
-            try:
-                self.commsChannel.sendall(bytesData)
-            except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
-                self.smartDot.stopAccel()
+            #Wait until Motor Instructions are first sent
 
-        def magDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                    0x00, 0x13, 0x4D]) # Send B_A_SD_SENSOR_DATA for MG
-            bytesData.extend(dataBytes)
-            try:
-                self.commsChannel.sendall(bytesData)
-            except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
-                self.smartDot.stopMag()
-        
-        def gyroDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                    0x00, 0x13, 0x47]) # Send B_A_SD_SENSOR_DATA for XL
-            bytesData.extend(dataBytes)
-            try:
-                self.commsChannel.sendall(bytesData)
-            except Exception: # Assumed Exception is caused from broken pipe, can look into another time
-               self.smartDot.stopGyro()
+            await self.startSmartDotHandler.wait()
+            print("Handling SmartDot:")
+            def accelDataSignal(dataBytes : bytearray):
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                        0x00, 0x13, 0x41]) # Send Sensor Data for XL  
+                bytesData.extend(dataBytes)
+                try:
+                    self.commsChannel.sendall(bytesData)
+                except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
+                    self.smartDot.stopAccel()
 
-        def lightDataSignal(dataBytes : bytearray):
-            bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                    0x00, 0x13, 0x4C])
-            bytesData.extend(dataBytes)
-            #Add 0's to "Y and Z values"
-            bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
-            try:
-                self.commsChannel.sendall(bytesData)
-            except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
-                print(f"Error Occured Somewhere in BSC: {e}")
-                self.smartDot.stopLight()
+            def magDataSignal(dataBytes : bytearray):
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                        0x00, 0x13, 0x4D]) # Send B_A_SD_SENSOR_DATA for MG
+                bytesData.extend(dataBytes)
+                try:
+                    self.commsChannel.sendall(bytesData)
+                except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
+                    self.smartDot.stopMag()
             
-        self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
-        #Instantly Setting the Start Configs for the 9DOF's to skip implementation
+            def gyroDataSignal(dataBytes : bytearray):
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                        0x00, 0x13, 0x47]) # Send B_A_SD_SENSOR_DATA for XL
+                bytesData.extend(dataBytes)
+                try:
+                    self.commsChannel.sendall(bytesData)
+                except Exception: # Assumed Exception is caused from broken pipe, can look into another time
+                    self.smartDot.stopGyro()
 
-        self.smartDot.startMag()
-        self.smartDot.startAccel()
-        self.smartDot.startGyro() 
-        self.smartDot.startLight()      
-        print("All started")
-        while self.startSmartDotHandler.is_set():
-            #Continuously check if SmartDotHandler should be open
-            await asyncio.sleep(1)
+            def lightDataSignal(dataBytes : bytearray):
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                        0x00, 0x13, 0x4C])
+                bytesData.extend(dataBytes)
+                #Add 0's to "Y and Z values"
+                bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
+                try:
+                    self.commsChannel.sendall(bytesData)
+                except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                    print(f"Error Occured Somewhere in BSC: {e}")
+                    self.smartDot.stopLight()
+                
+            self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
+            #Instantly Setting the Start Configs for the 9DOF's to skip implementation
+
+            self.smartDot.startMag()
+            self.smartDot.startAccel()
+            self.smartDot.startGyro() 
+            self.smartDot.startLight()      
+            print("All started")
+            while self.startSmartDotHandler.is_set():
+                #Continuously check if SmartDotHandler should be open
+                await asyncio.sleep(1)
+        
 
     async def commsHandler(self):
             loop = asyncio.get_event_loop()
@@ -332,9 +336,12 @@ class BallSpinnerController():
                                 self.secMotor2.turnOnMotor(0)
 
                                 #turn on Sensors
-                                self.sensor1 = CurrentSensor()
+                                self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
+                                self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
+                                self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
+
+                                self.startSensorHandler.set()
                                 print("Sensors Turned on")
-                                self.sensorHandlerThread = asyncio.create_task(self.sensorHandler())    
                                 self.mode = BSCModes.TAKING_SHOT_DATA
 
                                 
@@ -359,6 +366,15 @@ class BallSpinnerController():
                                 del self.PrimMotor
                                 del self.secMotor1
                                 del self.secMotor2
+                                
+
+                                print("Stopping Auxillary Sensors")
+
+                                self.startSensorHandler.clear()
+                                
+                                del self.motorCurrentSensor1
+                                del self.motorCurrentSensor2
+                                del self.motorCurrentSensor3
 
                                 #Stop SmartDot Data Collection
                                 self.smartDot.stopAccel()
@@ -367,6 +383,7 @@ class BallSpinnerController():
                                 self.smartDot.stopLight()
                                 self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                                 self.startSmartDotHandler.clear()
+                                self.startSensorHandler.clear()
 
                         case(MsgType.A_B_DISCONNECT_FROM_BSC):
                             print("Server Disconnected")
@@ -398,20 +415,33 @@ class BallSpinnerController():
 
             
     async def sensorHandler(self):
-        print("Ploop")
-        #motorEncoder = AuxSensorSimulator(None)
-        try:
-            while(True): #runs until Sensors are
-               # bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+        while True: # Allow for thread to loop when repeated Start
+
+
+            await self.startSensorHandler.wait()
+            
+            #motorEncoder = AuxSensorSimulator(None)
+            while(self.startSensorHandler.is_set()): #runs until Sensors are
+                # bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
                 #                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
                 
-               # bytesData.extend(motorEncoder.readData()) 
-                print(self.sensor1.readData()) 
-                asyncio.sleep(1)
-         
-        except asyncio.CancelledError: #Called when Sensor Thread is stopped
-            pass
+                # bytesData.extend(motorEncoder.readData()) 
+                m1cData = self.motorCurrentSensor1.readData()
+                self.data['motor_currents'][0] = m1cData
+                print("CurrentSensor 1: %f" % m1cData) 
+                #This will Be to Send Current Sensor Data to BSA
 
+                m2cData = self.motorCurrentSensor2.readData()
+                self.data['motor_currents'][1] = m2cData
+                print("CurrentSensor 2: %f" % m2cData) 
+                #This will Be to Send Current Sensor Data to BSA
+
+                m3cData = self.motorCurrentSensor3.readData()
+                self.data['motor_currents'][2] = m3cData
+                print("CurrentSensor 3: %f" % m2cData) 
+                #This will Be to Send Current Sensor Data to BSA
+
+                await asyncio.sleep(1)
 
 
 

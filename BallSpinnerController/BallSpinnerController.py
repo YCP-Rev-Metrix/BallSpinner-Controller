@@ -10,7 +10,8 @@ from .SmartDotEmulator import SmartDotEmulator
 from .iSmartDot import iSmartDot
 from .Motor import Motor
 from .StepperMotor import StepperMotor
-from .AuxSensors import AuxSensorSimulator
+from .AuxSensors import iAuxSensor
+from .AuxSensors.CurrentSensors import CurrentSensor
 import socket
 import struct
 import sys
@@ -298,6 +299,7 @@ class BallSpinnerController():
                             MGConfigSampleRate = data[5] >> 4 # Parse MG Bytes
                             LTConfigSampleRate = data[6] >> 4 # Parse LT Bytes
                             
+
                             #create List of XL Rates to set
                             XLSampleRates = [12.5, 25, 50, 100, 200, 400, 800, 1600] 
                             GYSampleRates = [25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
@@ -316,22 +318,27 @@ class BallSpinnerController():
                                 print(data)
                             
                                 self.startSmartDotHandler.set()
-                                
+                                 
+
                                 # First Motor Instruction:         
                                 #Turn On Motors
                                 print("Turning on motors")
-                                self.PrimMotor = StepperMotor(22)
-                                self.secMotor1 = StepperMotor(38)
-                                self.secMotor2 = StepperMotor(35)                
+                                self.PrimMotor = StepperMotor(18)
+                                self.secMotor1 = StepperMotor(23)
+                                self.secMotor2 = StepperMotor(24)                
 
                                 self.PrimMotor.turnOnMotor(0)
                                 self.secMotor1.turnOnMotor(0)
                                 self.secMotor2.turnOnMotor(0)
 
                                 #turn on Sensors
-                                #self.sensor1 = AuxSensorSim()
-                                self.startSensorHandler.set()
+                                self.sensor1 = CurrentSensor()
+                                print("Sensors Turned on")
+                                self.sensorHandlerThread = asyncio.create_task(self.sensorHandler())    
                                 self.mode = BSCModes.TAKING_SHOT_DATA
+
+                                
+   
                             
                             primMotorSpeed = int(data[3])
                             #primMotorSpeed = struct.unpack('<f', data[3:7])[0]
@@ -392,14 +399,14 @@ class BallSpinnerController():
             
     async def sensorHandler(self):
         print("Ploop")
-        motorEncoder = AuxSensorSimulator(None)
+        #motorEncoder = AuxSensorSimulator(None)
         try:
             while(True): #runs until Sensors are
-                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
+               # bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                #                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
                 
-                bytesData.extend(motorEncoder.readData()) 
-                print("Sending Sensor") 
+               # bytesData.extend(motorEncoder.readData()) 
+                print(self.sensor1.readData()) 
                 asyncio.sleep(1)
          
         except asyncio.CancelledError: #Called when Sensor Thread is stopped

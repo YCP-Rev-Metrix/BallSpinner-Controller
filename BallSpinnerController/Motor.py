@@ -9,7 +9,7 @@ class Motor():
 
         #Configure GPIO Pin
         GPIO.setwarnings(False)
-        GPIO.setmode(GPIO.BOARD)
+        GPIO.setmode(GPIO.BCM)
         
         GPIO.setup(GPIOPin, GPIO.OUT)
         #1kHz

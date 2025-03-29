@@ -57,7 +57,7 @@ class BallSpinnerController():
         self.scanner = None
 
         #Create shared dictionary for HMI(GUI)
-        self.shared_data = shared_data
+        self.data = shared_data
     
         print("Debug Mode: ON") if self.debug else None 
         try:
@@ -103,7 +103,10 @@ class BallSpinnerController():
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.commsPort.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             server_address = (ipAddr, 8411)  # Replace 'localhost' with the server's IP if needed
-            self.shared_data["ip"] = f"Socket: {ipAddr}:{8411}"
+
+            #Set the socket information in the HMI
+            self.data["ip"] = f"Socket: {ipAddr}:{8411}"
+
             print('Server listening on {}:{}'.format(*server_address))
             self.commsPort.bind(server_address)
           
@@ -122,7 +125,7 @@ class BallSpinnerController():
                     self.tCPscanAll(self.debug),
                     self.commsHandler(),
                     self.smartDotHandler(),
-                    self.check_shared_data(self.shared_data)
+                    self.check_shared_data(self.data)
                 )
             except OSError: #Raised if Comms is forcibly closed while waiting for message
                 print("Socket Closed, must restart")   
@@ -206,8 +209,8 @@ class BallSpinnerController():
                     print("Received: %s" % data.hex())  if self.debug else None
                     #Pass the last message to the HMI
                     p_msg = MsgType.name_from_value(data[0])
-                    self.shared_data["message_type"] = p_msg
-                    self.shared_data["protocol_queue"].put(p_msg)
+                    self.data["message_type"] = p_msg
+                    self.data["protocol_queue"].put(p_msg)
                     
                     match data[0]: 
                         #shared_data["message_type"] =
@@ -383,7 +386,7 @@ class BallSpinnerController():
                     print("Restarting Pipe")
                     raise BrokenPipeError
                 #Try reading the dictionary here and acting on a change to maybe the stop_BSC value
-                # print(self.shared_data["close_bsc"]) 
+                # print(self.data["close_bsc"]) 
                 # shared_data["close_bsc"] is True    
 
             

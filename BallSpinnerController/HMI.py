@@ -4,7 +4,7 @@ from BallSpinnerController import BallSpinnerController
 from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
 import random
 import queue
-from BallSpinnerController.Motor import Motor
+from BallSpinnerController.StepperMotor import StepperMotor
 class HMI:
     def __init__(self, data):
         
@@ -63,7 +63,7 @@ class HMI:
         
         #Local only elements
         self.motor_controller_window = self.create_motor_controller_window()
-        self.motor = Motor(GPIOPin=12)
+        self.motor = StepperMotor(GPIOPin=12)
         #List of elements to initially hide
 
         #initialize stack for back button

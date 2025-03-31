@@ -58,7 +58,7 @@ class StepperMotor(iMotor):
         if rpm > 0:
             if self.rpm == 0.0 :
                 self.turnOnMotor(self.rpm)
-            self.PWM.ChangeFrequency(rpm * 400)
+            self.PWM.ChangeFrequency(rpm * 400 / 60)
             self.rpm = rpm
 
 

@@ -165,6 +165,7 @@ class BallSpinnerController():
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
+                    print("Sending Mag")
                 except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopMag()
             
@@ -327,13 +328,15 @@ class BallSpinnerController():
                                 # First Motor Instruction:         
                                 #Turn On Motors
                                 print("Turning on motors")
-                                self.PrimMotor = StepperMotor(18)
+                                #I asked for a number between 1 and 20
+                                self.PrimMotor = StepperMotor(4) #``Carson`` chose 4
+                                print("PrimMotor Turned On")
                                 self.secMotor1 = StepperMotor(23)
                                 self.secMotor2 = StepperMotor(24)                
 
-                                self.PrimMotor.turnOnMotor(0)
-                                self.secMotor1.turnOnMotor(0)
-                                self.secMotor2.turnOnMotor(0)
+                                self.PrimMotor.turnOnMotor()
+                                self.secMotor1.turnOnMotor()
+                                self.secMotor2.turnOnMotor()
 
                                 #turn on Sensors
                                 self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
@@ -347,10 +350,11 @@ class BallSpinnerController():
                                 
    
                             
-                            primMotorSpeed = int(data[3])
-                            #primMotorSpeed = struct.unpack('<f', data[3:7])[0]
-                            print("Prim Motor Instruction: %f" % primMotorSpeed)
+                            #primMotorSpeed = int(data[3])
+                            primMotorSpeed = struct.unpack('<f', data[3:7])[0]
                             self.PrimMotor.changeSpeed(primMotorSpeed) 
+                            print("Prim Motor Instruction: %f" % primMotorSpeed)
+
                             self.secMotor1.changeSpeed(int(data[4])) 
                             self.secMotor2.changeSpeed(int(data[5]))
 
@@ -438,7 +442,7 @@ class BallSpinnerController():
 
                 m3cData = self.motorCurrentSensor3.readData()
                 self.data['motor_currents'][2] = m3cData
-                print("CurrentSensor 3: %f" % m2cData) 
+                print("CurrentSensor 3: %f" % m3cData) 
                 #This will Be to Send Current Sensor Data to BSA
 
                 await asyncio.sleep(1)

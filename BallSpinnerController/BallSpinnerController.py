@@ -340,12 +340,16 @@ class BallSpinnerController():
                                 self.secMotor2.turnOnMotor()
 
                                 #turn on Sensors
-                                self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
-                                self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
-                                self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
-
-                                self.startSensorHandler.set()
-                                print("Sensors Turned on")
+                                try:
+                                    self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
+                                    self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
+                                    self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
+                                    
+                                    self.startSensorHandler.set()
+                                    print("Sensors Turned on")
+                                except ValueError:
+                                    self.data['error_text'] = "I2C Not Detected, please Check Wiri"
+                                
                                 self.mode = BSCModes.TAKING_SHOT_DATA
 
                                 

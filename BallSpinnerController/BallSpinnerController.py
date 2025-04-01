@@ -296,6 +296,7 @@ class BallSpinnerController():
                                 self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                             else:
                                 self.smartDot = None
+                                self.data['error_text'] = "Unable To Connect To SmartDot, Please Restart"
                                 #NEED TO CHECK IF NOT TRUE, SEND ERROR
                         
                         case(MsgType.A_B_RECEIVE_CONFIG_INFO): #A_B_RECEIVE_CONFIG_INFO
@@ -354,9 +355,12 @@ class BallSpinnerController():
                             primMotorSpeed = struct.unpack('<f', data[3:7])[0]
                             self.PrimMotor.changeSpeed(primMotorSpeed) 
                             print("Prim Motor Instruction: %f" % primMotorSpeed)
-
+                            
+              
                             self.secMotor1.changeSpeed(int(data[4])) 
                             self.secMotor2.changeSpeed(int(data[5]))
+
+
 
                         case(MsgType.A_B_STOP_MOTOR): #STOP_MOTOR_INSTRUCTIONS
                             

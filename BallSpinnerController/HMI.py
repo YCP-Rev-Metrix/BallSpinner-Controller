@@ -67,9 +67,7 @@ class HMI:
         #List of elements to initially hide
 
         #initialize stack for back button
-        self.back_stack = []
-        #this list keeps track of what elements were just shown and is used in conjunction with self.back_stack
-        self.just_shown_elements = []
+        self.action_stack = [] #Filled with pairs of lists, lis[0] means it was just shown, list[1] means it was just hidden
 
         self.all_ui_elements = [
             self.title_label,
@@ -128,10 +126,6 @@ class HMI:
         self.initial_ui_elements_to_hide = self.hidden_ui_elements
         self.initial_ui_elements_to_show = self.shown_ui_elements
 
-        #Configure back button variables
-        self.back_stack.append(self.initial_ui_elements_to_hide)
-        self.just_shown_elements = self.initial_ui_elements_to_show
-
         #Create initial start screen by hiding and showing the correct elements
         self.hide_ui_elements(self.initial_ui_elements_to_hide)
         self.hide_ui_elements(self.button_toggleable_elements)
@@ -167,30 +161,28 @@ class HMI:
         except Exception as e:
             print(e)
 
-    #The back button utilizes a stack. When you want to update the UI, make sure you use change_page, even when opening small windows like protocol history window
-    def back_button_press(self):
-        ui_elements_to_show = self.back_stack.pop()
-        ui_elements_to_hide = self.just_shown_elements
+    def back_button_action_stack(self):
+        lists = self.action_stack.pop()
+        ui_elements_to_show = lists[1]
+        ui_elements_to_hide = lists[0]
 
-        print(f"SHOW: {ui_elements_to_show}")
-        print(f"HIDe: {ui_elements_to_hide}")
+        for i in self.button_toggleable_elements:
+            if i == True and i in ui_elements_to_hide:
+                ui_elements_to_show = list[0]
+                ui_elements_to_hide = list[1]
+            
+                print("accounting for the popup window")
 
-        #Show the top stack list
         self.show_ui_elements(ui_elements_to_show)
-        self.just_shown_elements = ui_elements_to_show
-
-        #Hide the most recently shown
         self.hide_ui_elements(ui_elements_to_hide)
+
 
     # Update Display
     def change_page(self, ui_elements_to_show, ui_elements_to_hide):
         print(f"PUSHED TO STACK: {ui_elements_to_hide}")
         print(f"JUST SHOWN: {ui_elements_to_show}")
         # if None in ui_elements_to_hide:
-        #     self.back_stack.append(self.just_shown_elements)
-        # else:
-        self.back_stack.append(ui_elements_to_hide)
-        self.just_shown_elements = ui_elements_to_show
+        self.action_stack.append([ui_elements_to_show, ui_elements_to_hide])
         if None not in ui_elements_to_hide:
             self.hide_ui_elements(ui_elements_to_hide)
         if None not in ui_elements_to_show:
@@ -399,7 +391,7 @@ class HMI:
 
 ################################################### Create Buttons ###################################################
     def create_reset_button(self):
-        reset_button = tk.Button(self.root, text="Back", command=self.back_button_press)
+        reset_button = tk.Button(self.root, text="Back", command=self.back_button_action_stack)
         reset_button.place(in_=self.frame,relx=0.05,rely=0.05)
         return reset_button
     # Create a button to close the window

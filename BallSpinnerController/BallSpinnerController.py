@@ -59,7 +59,6 @@ class BallSpinnerController():
 
         #Create shared dictionary for HMI(GUI)
         self.data = shared_data
-    
         print("Debug Mode: ON") if self.debug else None 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
@@ -92,7 +91,7 @@ class BallSpinnerController():
         #B_A_BSC_SHUTDOWN_BY_HMI
     async def check_shared_data(self, data):
         while True:
-            print("########## HMI Communication Occurring ##########")
+            #print("########## HMI Communication Occurring ##########")
             if data["close_bsc"] is True:
                 self.stop_server()
             await asyncio.sleep(1)
@@ -188,7 +187,13 @@ class BallSpinnerController():
                 except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
                     print(f"Error Occured Somewhere in BSC: {e}")
                     self.smartDot.stopLight()
-                
+
+           
+            #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
+            p_msg = MsgType.name_from_value(bytesData[0])
+            self.data["message_type"] = p_msg
+            self.data["protocol_queue"].put(p_msg)
+
             self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
             #Instantly Setting the Start Configs for the 9DOF's to skip implementation
 
@@ -232,6 +237,9 @@ class BallSpinnerController():
                                 print("Sending: APP_INIT_ACK Message") if self.debug else None
                                 #Grab Random Byte from third and resend
                                 bytesData = bytearray([MsgType.B_A_INIT_HANDSHAKE_ACK, 0x00, 0x01, data[3]]) # Send B_A_INIT_HANDSHAKE_ACK
+                                p_msg = MsgType.name_from_value(bytesData[0])
+                                self.data["message_type"] = p_msg
+                                self.data["protocol_queue"].put(p_msg)
                                 self.commsChannel.send(bytesData)
                                 self.mode = BSCModes.IDLE
 
@@ -241,6 +249,9 @@ class BallSpinnerController():
                             bytesData =bytearray([MsgType.B_A_NAME, 0x00, name.__len__()]) # Send B_A_NAME
                             bytesData.extend(name.encode("utf-8"))
                             print(bytes(bytesData))
+                            p_msg = MsgType.name_from_value(bytesData[0])
+                            self.data["message_type"] = p_msg
+                            self.data["protocol_queue"].put(p_msg)
                             self.commsChannel.send(bytesData)
                             self.mode = BSCModes.IDLE
                             pass
@@ -292,6 +303,9 @@ class BallSpinnerController():
                                                                                 self.smartDot.MG_availSampleRate, self.smartDot.MG_availRange,
                                                                                 self.smartDot.LT_availSampleRate, self.smartDot.LT_availRange))
                                 self.commsChannel.send(bytesData)
+                                p_msg = MsgType.name_from_value(bytesData[0])
+                                self.data["message_type"] = p_msg
+                                self.data["protocol_queue"].put(p_msg)
                                 self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                             else:
                                 self.smartDot = None
@@ -501,6 +515,9 @@ class BallSpinnerController():
                                         int(address[10:12],16)]))
                                         
                     bytesData.extend(name.encode("utf-8"))
+                    p_msg = MsgType.name_from_value(bytesData[0])
+                    self.data["message_type"] = p_msg
+                    self.data["protocol_queue"].put(p_msg)
                     self.commsChannel.send(bytesData)
                     print("Sending")
 

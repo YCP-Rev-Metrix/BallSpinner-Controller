@@ -5,11 +5,11 @@ import threading
 import subprocess
 from mbientlab.warble import BleScanner
 import six
-from .MetaMotion import MetaMotion
-from .SmartDotEmulator import SmartDotEmulator
-from .iSmartDot import iSmartDot
-from .Motor import Motor
-from .StepperMotor import StepperMotor
+from .SmartDots.MetaMotion import MetaMotion
+from .SmartDots.SmartDotEmulator import SmartDotEmulator
+from .SmartDots.iSmartDot import iSmartDot
+from .Motors.Motor import Motor
+from .Motors.StepperMotor import StepperMotor
 from .AuxSensors import iAuxSensor
 from .AuxSensors.CurrentSensors import CurrentSensor
 import socket

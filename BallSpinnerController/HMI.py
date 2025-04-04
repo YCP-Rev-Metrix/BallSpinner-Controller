@@ -4,7 +4,7 @@ from BallSpinnerController import BallSpinnerController
 from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
 import random
 import queue
-from BallSpinnerController.Motor import Motor
+from BallSpinnerController.StepperMotor import StepperMotor
 class HMI:
     def __init__(self, data):
         

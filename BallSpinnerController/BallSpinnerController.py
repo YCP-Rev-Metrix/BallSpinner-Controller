@@ -89,6 +89,7 @@ class BallSpinnerController():
         self.server.close()
         #TODO Correctly shut down server, send an error message to BSA too.
         #B_A_BSC_SHUTDOWN_BY_HMI
+        
     async def check_shared_data(self, data):
         while True:
             #print("########## HMI Communication Occurring ##########")
@@ -98,6 +99,20 @@ class BallSpinnerController():
     
     async def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
+
+        
+            #turn on Sensors
+            try:
+                self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
+                self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
+                self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
+                
+                currentSenorsOn = True
+                print("Sensors Turned on")
+            except ValueError:
+                self.data['error_text'] = "I2C Not Detected, please Check Wiri"
+                currentSenorsOn = False
+
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -164,6 +179,7 @@ class BallSpinnerController():
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
+                    print("Sending Mag")
                 except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopMag()
             
@@ -209,6 +225,7 @@ class BallSpinnerController():
 
     async def commsHandler(self):
             loop = asyncio.get_event_loop()
+
             while True:
                 
             #Read first message com
@@ -309,6 +326,7 @@ class BallSpinnerController():
                                 self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                             else:
                                 self.smartDot = None
+                                self.data['error_text'] = "Unable To Connect To SmartDot, Please Restart"
                                 #NEED TO CHECK IF NOT TRUE, SEND ERROR
                         
                         case(MsgType.A_B_RECEIVE_CONFIG_INFO): #A_B_RECEIVE_CONFIG_INFO
@@ -363,32 +381,32 @@ class BallSpinnerController():
                                 # First Motor Instruction:         
                                 #Turn On Motors
                                 print("Turning on motors")
-                                self.PrimMotor = StepperMotor(18)
+                                #I asked for a number between 1 and 20
+                                self.PrimMotor = StepperMotor(4) #``Carson`` chose 4
+                                print("PrimMotor Turned On")
                                 self.secMotor1 = StepperMotor(23)
                                 self.secMotor2 = StepperMotor(24)                
 
-                                self.PrimMotor.turnOnMotor(0)
-                                self.secMotor1.turnOnMotor(0)
-                                self.secMotor2.turnOnMotor(0)
+                                self.PrimMotor.turnOnMotor()
+                                self.secMotor1.turnOnMotor()
+                                self.secMotor2.turnOnMotor()
 
-                                #turn on Sensors
-                                self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
-                                self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
-                                self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
-
-                                self.startSensorHandler.set()
-                                print("Sensors Turned on")
+                                
                                 self.mode = BSCModes.TAKING_SHOT_DATA
 
                                 
    
                             
-                            primMotorSpeed = int(data[3])
-                            #primMotorSpeed = struct.unpack('<f', data[3:7])[0]
-                            print("Prim Motor Instruction: %f" % primMotorSpeed)
+                            #primMotorSpeed = int(data[3])
+                            primMotorSpeed = struct.unpack('<f', data[3:7])[0]
                             self.PrimMotor.changeSpeed(primMotorSpeed) 
+                            print("Prim Motor Instruction: %f" % primMotorSpeed)
+                            
+              
                             self.secMotor1.changeSpeed(int(data[4])) 
                             self.secMotor2.changeSpeed(int(data[5]))
+
+
 
                         case(MsgType.A_B_STOP_MOTOR): #STOP_MOTOR_INSTRUCTIONS
                             
@@ -430,7 +448,8 @@ class BallSpinnerController():
                                 
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
-                    
+                    self.data['error_text'] = "Disconnected From Application Side"
+
                     #If smartDot is connected, Disconnect
                     if self.smartDot != None:
                         print("Disconnecting from SmartDot")
@@ -438,7 +457,7 @@ class BallSpinnerController():
                     raise BrokenPipeError
                 except Exception as e:
                     print(f"Error Occured Somewhere in BSC: {e}")
-
+                    self.data['error_text'] = e
                     #If smartDot is connected, Disconnect
                     if self.smartDot != None:
                         print("Disconnecting from SmartDot")
@@ -474,7 +493,7 @@ class BallSpinnerController():
 
                 m3cData = self.motorCurrentSensor3.readData()
                 self.data['motor_currents'][2] = m3cData
-                print("CurrentSensor 3: %f" % m2cData) 
+                print("CurrentSensor 3: %f" % m3cData) 
                 #This will Be to Send Current Sensor Data to BSA
 
                 await asyncio.sleep(1)

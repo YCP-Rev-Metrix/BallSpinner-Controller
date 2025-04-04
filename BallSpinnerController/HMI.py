@@ -315,6 +315,8 @@ class HMI:
     def update_motor_controller_text(self):
         if self.motor:
             self.selected_motor.config(text=f"Controlling RPM of motor {self.active_motor}, RPM: {self.motor.rpm}")
+        if self.popup_speed.split(" ")[1] != self.motor.rpm:
+            self.popup_speed.config(text = f"Speed: {self.motor.rpm} RPM")
 
     def change_motor_speed(self, btn_idx):
         if self.motor.state == False:

@@ -90,6 +90,7 @@ class BallSpinnerController():
         self.server.close()
         #TODO Correctly shut down server, send an error message to BSA too.
         #B_A_BSC_SHUTDOWN_BY_HMI
+        
     async def check_shared_data(self, data):
         while True:
             print("########## HMI Communication Occurring ##########")
@@ -99,6 +100,20 @@ class BallSpinnerController():
     
     async def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
+
+        
+            #turn on Sensors
+            try:
+                self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
+                self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
+                self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
+                
+                currentSenorsOn = True
+                print("Sensors Turned on")
+            except ValueError:
+                self.data['error_text'] = "I2C Not Detected, please Check Wiri"
+                currentSenorsOn = False
+
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -205,6 +220,7 @@ class BallSpinnerController():
 
     async def commsHandler(self):
             loop = asyncio.get_event_loop()
+
             while True:
                 
             #Read first message com
@@ -339,16 +355,6 @@ class BallSpinnerController():
                                 self.secMotor1.turnOnMotor()
                                 self.secMotor2.turnOnMotor()
 
-                                #turn on Sensors
-                                try:
-                                    self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
-                                    self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
-                                    self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
-                                    
-                                    self.startSensorHandler.set()
-                                    print("Sensors Turned on")
-                                except ValueError:
-                                    self.data['error_text'] = "I2C Not Detected, please Check Wiri"
                                 
                                 self.mode = BSCModes.TAKING_SHOT_DATA
 
@@ -406,7 +412,8 @@ class BallSpinnerController():
                                 
                 except BrokenPipeError:
                     print("Pipe Error Caught in CommsHandler")
-                    
+                    self.data['error_text'] = "Disconnected From Application Side"
+
                     #If smartDot is connected, Disconnect
                     if self.smartDot != None:
                         print("Disconnecting from SmartDot")
@@ -414,7 +421,7 @@ class BallSpinnerController():
                     raise BrokenPipeError
                 except Exception as e:
                     print(f"Error Occured Somewhere in BSC: {e}")
-
+                    self.data['error_text'] = e
                     #If smartDot is connected, Disconnect
                     if self.smartDot != None:
                         print("Disconnecting from SmartDot")

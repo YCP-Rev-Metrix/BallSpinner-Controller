@@ -58,12 +58,14 @@ class HMI:
         self.reset_button = self.create_reset_button()
 
         self.protocol_history_list = []
+        self.protocol_history_circular_buffer_index = 0
+        self.protocol_history_circular_buffer_size = 50
         self.protocol_history_window = self.create_protocol_history_window()
         self.show_protocol_button = self.create_protocol_history_button()
         
         #Local only elements
         self.motor_controller_window = self.create_motor_controller_window()
-        self.motor = Motor(GPIOPin=12)
+        self.motor = None
         #List of elements to initially hide
 
         #initialize stack for back button
@@ -196,13 +198,27 @@ class HMI:
         updates = {
             self.e_label: self.data["error_text"],
             self.ip_label: self.data["ip"],
-            self.message_label: self.data["message_type"]
+            self.message_label: self.data["message_type"],
+            self.sd_xl : self.data["sample_rates"][0],
+            self.sd_gy : self.data["sample_rates"][1],
+            self.sd_mg : self.data["sample_rates"][2],
+            self.sd_lt : self.data["sample_rates"][3],
         }
 
         for label, new_text in updates.items():
             if label.cget("text") != new_text:
                 label.config(text=new_text)
         
+        #Update motor current value to keep updating while current changes based on active motor
+        #Get the exact value from the label
+        if self.popup_current.cget("text") != "" and self.active_motor is not None:
+            current_value = self.popup_current.cget("text").split(' ')[1].split('A')[0]
+            if current_value != self.data["motor_currents"][self.active_motor-1]:
+                self.popup_current.config(text=f"Current: {self.data['motor_currents'][self.active_motor-1]}A")
+       
+        #Check the motor rpm to update the local mode text
+        if self.motor is not None:
+            self.update_motor_controller_text()
         #Iterate through the protocol queue and write the messages to the history.
         while not self.data["protocol_queue"].empty():
             self.update_protocol_list(self.data["protocol_queue"].get())
@@ -297,7 +313,8 @@ class HMI:
         return mc_frame
 
     def update_motor_controller_text(self):
-        self.selected_motor.config(text=f"Controlling RPM of motor {self.active_motor}, RPM: {self.motor.rpm}")
+        if self.motor:
+            self.selected_motor.config(text=f"Controlling RPM of motor {self.active_motor}, RPM: {self.motor.rpm}")
 
     def change_motor_speed(self, btn_idx):
         if self.motor.state == False:
@@ -540,12 +557,14 @@ class HMI:
         # self.hide_ui_elements(self.bsc_ui_elements_to_hide)
         # #this is actually a toggle
         # self.show_protocol_history()
+        self.motor = None
 
 ################################################### Initialize Local Mode ###################################################
     def launch_local_mode(self):
         # self.local_ui_elements_to_show = self.initial_ui_elements_to_hide
         self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
         self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
+        self.motor =  Motor(GPIOPin=12)
 
 
 

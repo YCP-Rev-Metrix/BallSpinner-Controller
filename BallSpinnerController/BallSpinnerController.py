@@ -313,10 +313,13 @@ class BallSpinnerController():
                         
                         case(MsgType.A_B_RECEIVE_CONFIG_INFO): #A_B_RECEIVE_CONFIG_INFO
                             XLConfigSampleRate = data[3] >> 4 # Parse XL Bytes
+                            XLConfigRange = data[3] & 0x0F #Bitwise AND with (00001111)
                             GYConfigSampleRate = data[4] >> 4 # Parse GY Bytes
+                            GYConfigRange = data[4] & 0x0F
                             MGConfigSampleRate = data[5] >> 4 # Parse MG Bytes
+                            MGConfigRange = data[5] & 0x0F
                             LTConfigSampleRate = data[6] >> 4 # Parse LT Bytes
-                            
+                            LTConfigRange = data[6] & 0x0F
 
                             #create List of XL Rates to set
                             XLSampleRates = [12.5, 25, 50, 100, 200, 400, 800, 1600] 
@@ -324,10 +327,29 @@ class BallSpinnerController():
                             MGSampleRates = [2, 6, 8, 10, 15, 20, 25, 30]
                             LTSampleRates = [.5, 1, 2, 5, 10, 20]
 
+                            #create lists of ranges
+                            XLRanges = [2, 4, 8, 16, -1, -1, -1, -1]
+                            GYRanges = [125, 250, 500, 1000, 2000, -1, -1, -1]
+                            MGRanges = [2500, 4, 8, 16, 8, 16, 32, 64]
+                            LTRanges = [600, 1300, 8000, 16000, 32000, 64000, -1, -1]
+
                             self.smartDot.setSampleRates(XL = XLSampleRates[XLConfigSampleRate],
                                                             GY = GYSampleRates[GYConfigSampleRate],
                                                             MG = MGSampleRates[MGConfigSampleRate],
                                                             LT = LTSampleRates[LTConfigSampleRate])
+
+                            self.smartDot.setRanges(XL = XLRanges[XLConfigRange],
+                                                        GY = GYRanges[GYConfigRange],
+                                                        MG = MGRanges[MGConfigRange],
+                                                        LT = LTRanges[LTConfigRange])
+
+                            #This is actually rate and ranges
+                            #TODO: Rename dictionary list 
+                            self.data["sample_rates"][0] = f"{XLSampleRates[XLConfigSampleRate]}Hz, {XLRanges[XLConfigRange]}"
+                            self.data["sample_rates"][1] = f"{GYSampleRates[GYConfigSampleRate]}Hz, {GYRanges[GYConfigRange]}dps"
+                            self.data["sample_rates"][2] = f"{MGSampleRates[MGConfigSampleRate]}Hz, {MGRanges[MGConfigRange]}μT"
+                            self.data["sample_rates"][3] = f"{LTSampleRates[LTConfigSampleRate]}, {LTRanges[LTConfigRange]}Lux"
+                            
                             
                         case(MsgType.A_B_MOTOR_INSTRUCTIONS): #MOTOR_INSTRUCTIONS Message
                             #print("Received Motor Instruction")

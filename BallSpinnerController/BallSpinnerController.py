@@ -382,7 +382,7 @@ class BallSpinnerController():
                                 #Turn On Motors
                                 print("Turning on motors")
                                 #I asked for a number between 1 and 20
-                                self.PrimMotor = StepperMotor(4) #``Carson`` chose 4
+                                self.PrimMotor = StepperMotor(12) #``Carson`` chose 4
                                 print("PrimMotor Turned On")
                                 self.secMotor1 = StepperMotor(23)
                                 self.secMotor2 = StepperMotor(24)                

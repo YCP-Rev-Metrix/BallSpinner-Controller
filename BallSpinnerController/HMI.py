@@ -30,9 +30,17 @@ class HMI:
 
 ################################################### Initialize UI ###################################################\
         self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
-        self.root.geometry("800x480")
+        # Remove window decorations (title bar, borders)
+        self.root.overrideredirect(True)
+        # Set window size to full screen
+
+        # Keep window on top (optional)
+        self.root.attributes("-topmost", True)
+        # self.root.geometry("800x480")
         self.screen_width = 800
         self.screen_height = 480
+        self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
+
         
         self.root.title("Ball Spinner HMI")
         self.root.configure(bg=self.data["bg_color"])  # Set the background color of the window
@@ -566,7 +574,7 @@ class HMI:
         # self.local_ui_elements_to_show = self.initial_ui_elements_to_hide
         self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
         self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
-        self.motor =  Motor(GPIOPin=12)
+        self.motor =  StepperMotor(GPIOPin=12)
 
 
 

@@ -106,11 +106,10 @@ class BallSpinnerController():
                 self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
                 self.motorCurrentSensor2 = CurrentSensor(ADC_IN=1)
                 self.motorCurrentSensor3 = CurrentSensor(ADC_IN=2)
-                
-                currentSenorsOn = True
+                self.currentSenorsOn = True
                 print("Sensors Turned on")
             except ValueError:
-                self.data['error_text'] = "I2C Not Detected, please Check Wiri"
+                self.data['error_text'] = "I2C Not Detected, please Check Wifi"
                 currentSenorsOn = False
 
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
@@ -132,9 +131,7 @@ class BallSpinnerController():
             try:
                 #Start up all Tasks PROPERLY (Your welcome Brandon)
                 self.startScanner = asyncio.Event()
-                self.startSmartDotHandler = asyncio.Event()
-                self.startSensorHandler = asyncio.Event()
-                self.startSensorHandler= asyncio.Event()    
+                self.startSmartDotHandler = asyncio.Event() 
 
                 await asyncio.gather(
                     self.tCPscanAll(self.debug),
@@ -170,6 +167,11 @@ class BallSpinnerController():
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
+                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
+                    #p_msg = MsgType.name_from_value(bytesData[0])
+                    #self.data["message_type"] = p_msg
+                    #self.data["protocol_queue"].put(p_msg)
+             
                 except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopAccel()
 
@@ -180,6 +182,11 @@ class BallSpinnerController():
                 try:
                     self.commsChannel.sendall(bytesData)
                     print("Sending Mag")
+                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
+                    #p_msg = MsgType.name_from_value(bytesData[0])
+                    #self.data["message_type"] = p_msg
+                    #self.data["protocol_queue"].put(p_msg)
+             
                 except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopMag()
             
@@ -189,6 +196,11 @@ class BallSpinnerController():
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
+                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
+                    #p_msg = MsgType.name_from_value(bytesData[0])
+                    #self.data["message_type"] = p_msg
+                    #self.data["protocol_queue"].put(p_msg)
+             
                 except Exception: # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopGyro()
 
@@ -200,15 +212,16 @@ class BallSpinnerController():
                 bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
                 try:
                     self.commsChannel.sendall(bytesData)
+                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
+                    #p_msg = MsgType.name_from_value(bytesData[0])
+                    #self.data["message_type"] = p_msg
+                    #self.data["protocol_queue"].put(p_msg)
                 except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
                     print(f"Error Occured Somewhere in BSC: {e}")
                     self.smartDot.stopLight()
 
            
-            #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
-            p_msg = MsgType.name_from_value(bytesData[0])
-            self.data["message_type"] = p_msg
-            self.data["protocol_queue"].put(p_msg)
+           
 
             self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
             #Instantly Setting the Start Configs for the 9DOF's to skip implementation
@@ -222,7 +235,6 @@ class BallSpinnerController():
                 #Continuously check if SmartDotHandler should be open
                 await asyncio.sleep(1)
         
-
     async def commsHandler(self):
             loop = asyncio.get_event_loop()
 
@@ -313,7 +325,22 @@ class BallSpinnerController():
                             if self.smartDot.connect(smartDotMACStr):   
                                 bytesData = bytearray([0x08, 0x00, 0x08]) #send B_A_RECEIVE_CONFIG_INFO
                                 print("sending bytesData")
-                                #bytesData.extend(data[3:9]) 
+                                #Set Sample Rates and Ranges on HMI
+                                #TODO: Rename dictionary list 
+                                #set default Sample Rates and Ranges
+                                
+                                defaultXLSampleRate = 100
+                                defaultGYSampleRate = 100
+                                defaultMGSampleRate = 10
+                                defaultLTSampleRate = .5
+
+                                self.smartDot.setSampleRates(XL=100, GY=100, MG=10, LT=.5)
+                                
+                                self.data["sample_rates"][0] = f"{defaultXLSampleRate}Hz, 2g" #Hardcoded unitl the Pass Ranges values work
+                                self.data["sample_rates"][1] = f"{defaultGYSampleRate}Hz, 125dps"
+                                self.data["sample_rates"][2] = f"{defaultMGSampleRate}Hz, 1000/2000 μT"
+                                self.data["sample_rates"][3] = f"{defaultLTSampleRate}Hz, 600 Lux"
+
                                 #determine rate and ranges
                                 bytesData.extend(bitMappings.sendConfigSettings(self.smartDot.XL_availSampleRate, self.smartDot.XL_availRange,
                                                                                 self.smartDot.GY_availSampleRate, self.smartDot.GY_availRange,
@@ -363,10 +390,10 @@ class BallSpinnerController():
 
                             #This is actually rate and ranges
                             #TODO: Rename dictionary list 
-                            self.data["sample_rates"][0] = f"{XLSampleRates[XLConfigSampleRate]}Hz, {XLRanges[XLConfigRange]}"
+                            self.data["sample_rates"][0] = f"{XLSampleRates[XLConfigSampleRate]}Hz, {XLRanges[XLConfigRange]}g"
                             self.data["sample_rates"][1] = f"{GYSampleRates[GYConfigSampleRate]}Hz, {GYRanges[GYConfigRange]}dps"
                             self.data["sample_rates"][2] = f"{MGSampleRates[MGConfigSampleRate]}Hz, {MGRanges[MGConfigRange]}μT"
-                            self.data["sample_rates"][3] = f"{LTSampleRates[LTConfigSampleRate]}, {LTRanges[LTConfigRange]}Lux"
+                            self.data["sample_rates"][3] = f"{LTSampleRates[LTConfigSampleRate]}Hz, {LTRanges[LTConfigRange]}Lux"
                             
                             
                         case(MsgType.A_B_MOTOR_INSTRUCTIONS): #MOTOR_INSTRUCTIONS Message
@@ -382,7 +409,7 @@ class BallSpinnerController():
                                 #Turn On Motors
                                 print("Turning on motors")
                                 #I asked for a number between 1 and 20
-                                self.PrimMotor = StepperMotor(12) #``Carson`` chose 4
+                                self.PrimMotor = StepperMotor(12) 
                                 print("PrimMotor Turned On")
                                 self.secMotor1 = StepperMotor(23)
                                 self.secMotor2 = StepperMotor(24)                
@@ -423,8 +450,6 @@ class BallSpinnerController():
                                 
 
                                 print("Stopping Auxillary Sensors")
-
-                                self.startSensorHandler.clear()
                                 
                                 del self.motorCurrentSensor1
                                 del self.motorCurrentSensor2
@@ -437,7 +462,7 @@ class BallSpinnerController():
                                 self.smartDot.stopLight()
                                 self.mode = BSCModes.READY_FOR_INSTRUCTIONS
                                 self.startSmartDotHandler.clear()
-                                self.startSensorHandler.clear()
+                                self.currentSenorsOn = False
 
                         case(MsgType.A_B_DISCONNECT_FROM_BSC):
                             print("Server Disconnected")
@@ -467,22 +492,18 @@ class BallSpinnerController():
                 #Try reading the dictionary here and acting on a change to maybe the stop_BSC value
                 # print(self.data["close_bsc"]) 
                 # shared_data["close_bsc"] is True    
-
-            
+           
     async def sensorHandler(self):
         while True: # Allow for thread to loop when repeated Start
 
-
-            await self.startSensorHandler.wait()
-            
             #motorEncoder = AuxSensorSimulator(None)
-            while(self.startSensorHandler.is_set()): #runs until Sensors are
+            while(self.currentSenorsOn): #runs until Sensors are
                 # bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
                 #                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
                 
                 # bytesData.extend(motorEncoder.readData()) 
                 m1cData = self.motorCurrentSensor1.readData()
-                self.data['motor_currents'][0] = m1cData
+                self.data['motor_currents'][0] = "%.1f " % m1cData
                 print("CurrentSensor 1: %f" % m1cData) 
                 #This will Be to Send Current Sensor Data to BSA
 
@@ -497,8 +518,6 @@ class BallSpinnerController():
                 #This will Be to Send Current Sensor Data to BSA
 
                 await asyncio.sleep(1)
-
-
 
     async def tCPscanAll(self, debugMode):
         #Wait until Application receives Start Scanner Message

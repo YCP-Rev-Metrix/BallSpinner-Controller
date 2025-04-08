@@ -4,7 +4,7 @@ from BallSpinnerController import BallSpinnerController
 from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
 import random
 import queue
-from BallSpinnerController.StepperMotor import StepperMotor
+from BallSpinnerController.Motors.StepperMotor import StepperMotor
 import asyncio
 
 class HMI:

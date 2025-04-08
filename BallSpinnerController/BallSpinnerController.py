@@ -11,6 +11,7 @@ from .SmartDots.iSmartDot import iSmartDot
 from .Motors.Motor import Motor
 from .Motors.StepperMotor import StepperMotor
 from .AuxSensors import iAuxSensor
+from .AuxSensors.MotorEncoder import MotorEncoder
 from .AuxSensors.CurrentSensors import CurrentSensor
 import socket
 import struct
@@ -102,6 +103,7 @@ class BallSpinnerController():
                     self.secMotor2.turnOffMotor()   
                 data["estop"] = False
             await asyncio.sleep(1)
+  
     async def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
 
@@ -117,6 +119,11 @@ class BallSpinnerController():
                 self.data['error_text'] = "I2C Not Detected, please Check Wifi"
                 self.currentSenorsOn = False
 
+            try:
+                self.motorEncoder1 = MotorEncoder()
+                self.motorEncodersOn = True
+            except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                    print(f"Error When attempting to set up Motor Encoder: {e}")                
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -488,45 +495,55 @@ class BallSpinnerController():
     async def sensorHandler(self):
         while True: # Allow for thread to loop when repeated Start
 
-            while(self.currentSenorsOn): #runs until Sensors are turned off
+            while(self.currentSenorsOn or self.motorEncodersOn): #runs until Sensors are turned off
                
-                # bytesData.extend(motorEncoder.readData()) 
-                m1cData = self.motorCurrentSensor1.readData()
-               
-                self.data['motor_currents'][0] = "%.2f " % m1cData
-                #print("CurrentSensor 1: %f" % m1cData) 
-               
-                #Send data to BSA
-                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, SensorType.C1_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
-                bytesData.extend(struct.pack('<f', m1cData))
-                print("Sending C1 to BSA")
+                if self.currentSenorsOn:
+                    # bytesData.extend(motorEncoder.readData()) 
+                    m1cData = self.motorCurrentSensor1.readData()
+                
+                    self.data['motor_currents'][0] = "%.2f " % m1cData
+                    #print("CurrentSensor 1: %f" % m1cData) 
+                
+                    #Send data to BSA
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x13, SensorType.C1_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend(struct.pack('<f', m1cData))
+                    print("Sending C1 to BSA")
 
-                m2cData = self.motorCurrentSensor2.readData()
-                
-                self.data['motor_currents'][1] ="%.2f " % m2cData
-                #print("CurrentSensor 2: %f" % m2cData) 
-                
-                #Send data to BSA
-                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, SensorType.C2_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
-                bytesData.extend(struct.pack('<f', m2cData))
-                print("Sending C2 to BSA")
-                
-                m3cData = self.motorCurrentSensor3.readData()
-                self.data['motor_currents'][2] = "%.2f " % m3cData
-                #print("CurrentSensor 3: %f" % m3cData) 
-                #This will Be to Send Current Sensor Data to BSA
-                
-                #Send data to BSA
-                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
-                bytesData.extend(struct.pack('<f', m3cData))
-                print("Sending C3 to BSA")
-                
+                    m2cData = self.motorCurrentSensor2.readData()
+                    
+                    self.data['motor_currents'][1] ="%.2f " % m2cData
+                    #print("CurrentSensor 2: %f" % m2cData) 
+                    
+                    #Send data to BSA
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x13, SensorType.C2_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend(struct.pack('<f', m2cData))
+                    print("Sending C2 to BSA")
+                    
+                    m3cData = self.motorCurrentSensor3.readData()
+                    self.data['motor_currents'][2] = "%.2f " % m3cData
+                    #print("CurrentSensor 3: %f" % m3cData) 
+                    #This will Be to Send Current Sensor Data to BSA
+                    
+                    #Send data to BSA
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x13, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend(struct.pack('<f', m3cData))
+                    print("Sending C3 to BSA")
+
+                if self.motorEncodersOn:
+                    me1cData = self.motorEncoder1.readData()
+                    print("Motor 1 RPM %.2f" % self.motorEncoder1.readData())
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x13, SensorType.M1_ENC]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend(struct.pack('<f', me1cData))
+                    print("Sending ME1 to BSA")
+
                 await asyncio.sleep(1)
 
-        await asyncio.sleep(1)
+            await asyncio.sleep(1)
+   
     async def tCPscanAll(self, debugMode):
         #Wait until Application receives Start Scanner Message
         await self.startScanner.wait()

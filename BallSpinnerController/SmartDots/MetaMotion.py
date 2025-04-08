@@ -70,8 +70,7 @@ class MetaMotion(iSmartDot):
             self.LT_availRange = MetaMotion.LT_availRange
             self.LT_availSampleRate = MetaMotion.LT_availSampleRate
 
-            #set default Sample Rates and Ranges
-            self.setSampleRates(XL=100, GY=100, MG=10, LT=.5)
+           
             #self.setSampleRanges(XL=100, GY=100, MG=10)
 
             self.XL_Range = 2

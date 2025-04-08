@@ -4,6 +4,9 @@ from BallSpinnerController import BallSpinnerController
 from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
 import random
 import queue
+from BallSpinnerController.StepperMotor import StepperMotor
+import asyncio
+
 class HMI:
     def __init__(self, data):
         
@@ -29,9 +32,17 @@ class HMI:
 
 ################################################### Initialize UI ###################################################\
         self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
-        self.root.geometry("800x480")
+        # Remove window decorations (title bar, borders)
+        self.root.overrideredirect(True)
+        # Set window size to full screen
+
+        # Keep window on top (optional)
+        self.root.attributes("-topmost", True)
+        # self.root.geometry("800x480")
         self.screen_width = 800
         self.screen_height = 480
+        self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
+
         
         self.root.title("Ball Spinner HMI")
         self.root.configure(bg=self.data["bg_color"])  # Set the background color of the window
@@ -57,10 +68,18 @@ class HMI:
         self.reset_button = self.create_reset_button()
 
         self.protocol_history_list = []
+        self.protocol_history_circular_buffer_index = 0
+        self.protocol_history_circular_buffer_size = 50
         self.protocol_history_window = self.create_protocol_history_window()
         self.show_protocol_button = self.create_protocol_history_button()
+        
+        #Local only elements
+        self.motor_controller_window = self.create_motor_controller_window()
+        self.motor = None
         #List of elements to initially hide
 
+        #initialize stack for back button
+        self.action_stack = [] #Filled with pairs of lists, lis[0] means it was just shown, list[1] means it was just hidden
 
         self.all_ui_elements = [
             self.title_label,
@@ -81,10 +100,9 @@ class HMI:
             self.show_protocol_button,
         ]
 
-        self.is_element_showing_list = []
-        self.is_protocol_visible = False
+        #self.is_protocol_visible = False
         
-        #Initialize the lists with 
+        #Initialize the lists for the BSC page
         self.hidden_ui_elements = [
             self.ip_label,
             self.mode_label,
@@ -94,8 +112,9 @@ class HMI:
             self.show_protocol_button,
             self.motor_buttons,
             self.reset_button,
-
+            # self.protocol_history_window,
         ]
+        #These are for the BSC page
         self.shown_ui_elements = [
             self.title_label,
             self.e_frame, 
@@ -105,9 +124,11 @@ class HMI:
             self.local_mode_button, 
             self.motor_popup
         ]
-        self.button_toggleable_elements = [
-            self.protocol_history_window,
-        ]
+
+        #False means it is hidden, true means it is shown
+        self.button_toggleable_elements = {
+            self.protocol_history_window : False,
+        }
 
         #self.shown_ui_elements = [element for element in self.all_ui_elements if element not in self.hidden_ui_elements]
        # print(f"SHOWN UI ELEMENTS: {self.shown_ui_elements}")
@@ -116,8 +137,22 @@ class HMI:
     
         self.initial_ui_elements_to_hide = self.hidden_ui_elements
         self.initial_ui_elements_to_show = self.shown_ui_elements
+
+        #Create initial start screen by hiding and showing the correct elements
         self.hide_ui_elements(self.initial_ui_elements_to_hide)
         self.hide_ui_elements(self.button_toggleable_elements)
+
+        #Local mode list initialization
+        self.local_ui_elements_to_show = [
+            self.motor_buttons, 
+            self.reset_button,
+            self.motor_controller_window,
+            self.emergency_stop_button,
+
+        ]
+        self.hide_ui_elements(self.local_ui_elements_to_show)
+
+
 
         
 
@@ -125,44 +160,46 @@ class HMI:
    
    #CONSIDER TRY CATCHING EACH attempt
     def hide_ui_elements(self, ui_element_list):
-        for e in ui_element_list:
-            e.lower(self.frame)#pass in root frame
+        try:
+            for e in ui_element_list:
+                e.lower(self.frame)#pass in root frame
+        except Exception as e:
+            print(e)
+
     def show_ui_elements(self, ui_element_list):
-         for e in ui_element_list:
-            e.lift(self.frame)
-    
-    #Ideas for a modular page changer/good back button
-    #We would want a way to track the different visibile commands we call.
-    # a STACK! of lists of previously shown arrays
+        try:
+            for e in ui_element_list:
+                e.lift(self.frame)
+        except Exception as e:
+            print(e)
 
-    # Stack of previously_shown_elements[] lists
-    # list for most_recently_shown_elements[]
+    def back_button_action_stack(self):
+        lists = self.action_stack.pop()
+        ui_elements_to_show = lists[1]
+        ui_elements_to_hide = lists[0]
 
-    # Back button: 
-    # Pop top most stack element. Make the elements from this pop as visible. 
-    # What do we hide? most_recently_shown_elements. 
-    # Set recently_shown_elements to the popped list.
-    # IF our popped list is = to initial HMI element list, then this means we need to shutdown server and whatever else and enter reset state
-    def previous_page(self):
-        show_elements = self.hidden_ui_elements
-        self.hidden_ui_elements = self.shown_ui_elements
-        self.shown_ui_elements = show_elements
-        self.show_ui_elements(show_elements)
-        self.hide_ui_elements(self.hidden_ui_elements)
-        hide_elements = selfs
+        for i in self.button_toggleable_elements:
+            if i == True and i in ui_elements_to_hide:
+                ui_elements_to_show = list[0]
+                ui_elements_to_hide = list[1]
+            
+                print("accounting for the popup window")
 
-        return ui_elements
-    
-    def full_reset_ui(self):
-        print("RESET UI")
-        # self.previous_page()
-        self.reset_bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
-        self.hide_ui_elements(self.reset_bsc_ui_elements_to_show)
-        self.bsc_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
-        self.show_ui_elements(self.bsc_ui_elements_to_hide)
-    #Change page
-    def change_page(self, ui_element_list_to_show):
-        pass
+        self.show_ui_elements(ui_elements_to_show)
+        self.hide_ui_elements(ui_elements_to_hide)
+
+
+    # Update Display
+    def change_page(self, ui_elements_to_show, ui_elements_to_hide):
+        print(f"PUSHED TO STACK: {ui_elements_to_hide}")
+        print(f"JUST SHOWN: {ui_elements_to_show}")
+        # if None in ui_elements_to_hide:
+        self.action_stack.append([ui_elements_to_show, ui_elements_to_hide])
+        if None not in ui_elements_to_hide:
+            self.hide_ui_elements(ui_elements_to_hide)
+        if None not in ui_elements_to_show:
+            self.show_ui_elements(ui_elements_to_show)
+
 ################################################### Initialize Loops ###################################################\
     def run(self):
         self.root.mainloop()
@@ -171,13 +208,27 @@ class HMI:
         updates = {
             self.e_label: self.data["error_text"],
             self.ip_label: self.data["ip"],
-            self.message_label: self.data["message_type"]
+            self.message_label: self.data["message_type"],
+            self.sd_xl : self.data["sample_rates"][0],
+            self.sd_gy : self.data["sample_rates"][1],
+            self.sd_mg : self.data["sample_rates"][2],
+            self.sd_lt : self.data["sample_rates"][3],
         }
 
         for label, new_text in updates.items():
             if label.cget("text") != new_text:
                 label.config(text=new_text)
         
+        #Update motor current value to keep updating while current changes based on active motor
+        #Get the exact value from the label
+        if self.popup_current.cget("text") != "" and self.active_motor is not None:
+            current_value = self.popup_current.cget("text").split(' ')[1].split('A')[0]
+            if current_value != self.data["motor_currents"][self.active_motor-1]:
+                self.popup_current.config(text=f"Current: {self.data['motor_currents'][self.active_motor-1]}A")
+       
+        #Check the motor rpm to update the local mode text
+        if self.motor is not None:
+            self.update_motor_controller_text()
         #Iterate through the protocol queue and write the messages to the history.
         while not self.data["protocol_queue"].empty():
             self.update_protocol_list(self.data["protocol_queue"].get())
@@ -242,6 +293,55 @@ class HMI:
         label.grid(row=0, column=0) 
         self.protocol_labels.append(label)
 
+################################################### Local Motor Controller ###################################################
+    def create_motor_controller_window(self):
+        x = 200
+        y = 333
+        
+        # Create a frame inside self.frame
+        mc_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge", width = 400, height = 100)
+        mc_frame.place(x=x, y=y)
+        mc_frame.grid_propagate(False) #Don't shrink frame to content
+
+
+        # Configure columns for centering
+        for i in range(8):  
+            mc_frame.grid_columnconfigure(i, weight=1)  # Stretch columns equally
+
+        
+        # Create a label inside mc_frame
+        self.selected_motor = tk.Label(mc_frame, bg="lightgray", text=f"Select a motor button", font=("Arial", 12,))
+        self.selected_motor.grid(row=0, column=0, columnspan=3, pady=5)
+
+        # Create buttons inside mc_frame using grid (instead of pack)
+        self.motor_controller_buttons = []
+        self.motor_button_text_list = ["-50", "-10", "-1", "+1", "+10", "+50"]
+        for i in range(6):
+            btn = tk.Button(mc_frame, text=self.motor_button_text_list[i], width = 2, font=("Arial", 14, "bold"), command=lambda i=i: self.change_motor_speed(i))
+            btn.grid(row=1, column=i, padx=5, pady=5,)
+            self.motor_controller_buttons.append(btn)
+        return mc_frame
+
+    def update_motor_controller_text(self):
+        if self.motor:
+            self.selected_motor.config(text=f"Controlling RPM of motor {self.active_motor}, RPM: {self.motor.rpm}")
+            if self.popup_speed.cget("text") != "" and self.popup_speed.cget("text").split(" ")[1] != self.motor.rpm:
+                self.popup_speed.config(text = f"Speed: {self.motor.rpm} RPM")
+
+    def change_motor_speed(self, btn_idx):
+        if self.motor.state == False:
+            self.motor.turnOnMotor()
+        increment = self.motor_button_text_list[btn_idx]
+        if btn_idx > 2:
+            increment = int(increment.split("+")[1])
+        else:
+            increment = int(increment)
+        print(f"Button idx {btn_idx}")
+        print(f"Changing motor speed by: {increment}")
+        self.motor.changeSpeed(self.motor.rpm + increment)
+        print(f"Motor speed should now be: {self.motor.rpm}")\
+
+        self.update_motor_controller_text()
 
 ################################################### Motor Data popup ###################################################
     def create_motor_popup(self):
@@ -259,10 +359,10 @@ class HMI:
         self.close_button = tk.Button(popup_frame, text="Close", command=self.hide_popup)
 
         # Pack elements inside the popup frame
-        self.popup_title.pack(in_=popup_frame,)
+        self.popup_title.pack(in_=popup_frame,pady=5)
         self.popup_speed.pack(in_=popup_frame,)
         self.popup_temp.pack(in_=popup_frame,)
-        self.popup_current.pack(in_=popup_frame,pady=5)
+        self.popup_current.pack(in_=popup_frame,)
         self.popup_status.pack(in_=popup_frame,)
         self.close_button.pack(in_=popup_frame, pady=5)
         return popup_frame        
@@ -276,7 +376,7 @@ class HMI:
 
     def show_popup(self, motor_id):
         """Updates and displays the popup with motor details."""
-        self.popup_current.config(text=f"Current: {self.data['motor_currents'][motor_id]}A")
+        self.popup_current.config(text=f"Current: {self.data['motor_currents'][motor_id-1]}A")
         self.popup_title.config(text=f"Motor {motor_id} Details")
         self.popup_speed.config(text=f"Speed: {100 + motor_id * 10} RPM")
         self.popup_temp.config(text=f"Temperature: {40 + motor_id}°C")
@@ -286,12 +386,13 @@ class HMI:
         self.motor_popup.place(in_=self.frame, relx=0.5, rely=0.5, anchor="center")
         self.active_motor = motor_id  # Store active motor
 
+        self.update_motor_controller_text()
+
     def hide_popup(self):
         """Hides the popup."""
         self.motor_popup.place_forget()
         self.active_motor = None  # Reset active motor
     
-
 
 ################################################### SD Data Display ###################################################
     #Create the SD window on the right side of the UI
@@ -319,7 +420,7 @@ class HMI:
 
 ################################################### Create Buttons ###################################################
     def create_reset_button(self):
-        reset_button = tk.Button(self.root, text="Back", command=self.reset_to_init_state)
+        reset_button = tk.Button(self.root, text="Back", command=self.back_button_action_stack)
         reset_button.place(in_=self.frame,relx=0.05,rely=0.05)
         return reset_button
     # Create a button to close the window
@@ -384,7 +485,7 @@ class HMI:
     def create_emergency_stop_button(self):
         #Creates an emergency stop button in the bottom-left corner of the root window.
         bottom_left_button = tk.Button(self.root, text="EMERGENCY STOP MOTOR", bg="red", command=self.emergency_stop_click)
-        bottom_left_button.place(in_=self.frame, relx=0.05, rely=0.95, anchor="sw", width=200, height=50)
+        bottom_left_button.place(in_=self.frame, relx=0.05, rely=0.95, anchor="sw", width=150, height=50)
         
         # Bind events to track the press and release
         bottom_left_button.bind("<ButtonPress-1>", self.start_emergency_stop_timer)
@@ -418,7 +519,10 @@ class HMI:
 
     def emergency_stop_action(self):
         self.is_emergency_stopped = True
-        self.data["error_text"] = f"IMPLEMENT STOP OF MOTOR"
+        self.data["error_text"] = f"Emergency Stopped motor"
+        self.data["estop"] = True
+        self.motor.turnOffMotor()
+        print("Emergency Stopped Motor")
 
     def close_window(self):
         self.root.destroy()
@@ -432,17 +536,14 @@ class HMI:
         self.full_reset_ui()
         
     def show_protocol_history(self):
-        l = [self.protocol_history_window]
-
-        if not self.is_protocol_visible:
-            self.show_ui_elements(l)
-            self.is_protocol_visible = True
+        show = [None]
+        hide = [None]
+        if self.button_toggleable_elements[self.protocol_history_window] == False:
+            show = [self.protocol_history_window]
         else:
-            self.hide_ui_elements(l)
-            self.is_protocol_visible = False
-        
-        #self.update_protocol_list(f"{random.randint(0,10)}")
-
+            hide = [self.protocol_history_window]
+        self.button_toggleable_elements[self.protocol_history_window] = not self.button_toggleable_elements[self.protocol_history_window]
+        self.change_page(show, hide)          
 
 
 ################################################### Initialize BSC ###################################################
@@ -463,20 +564,20 @@ class HMI:
 
         #Modify the current UI layout to fit the server mode.
         self.bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
-        self.show_ui_elements(self.bsc_ui_elements_to_show)
-
-        self.bsc_ui_elements_to_hide = {self.bsc_button, self.local_mode_button}
-        self.hide_ui_elements(self.bsc_ui_elements_to_hide)
-
+        # self.show_ui_elements(self.bsc_ui_elements_to_show)
+        self.bsc_ui_elements_to_hide = {self.bsc_button, self.local_mode_button,}
+        self.change_page(self.bsc_ui_elements_to_show, self.bsc_ui_elements_to_hide)
+        # self.hide_ui_elements(self.bsc_ui_elements_to_hide)
         # #this is actually a toggle
         # self.show_protocol_history()
+        self.motor = None
 
 ################################################### Initialize Local Mode ###################################################
     def launch_local_mode(self):
-        self.bsc_ui_elements_to_show = self.initial_ui_elements_to_hide
-        self.show_ui_elements(self.bsc_ui_elements_to_show)
-        self.bsc_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
-        self.hide_ui_elements(self.bsc_ui_elements_to_hide)
+        # self.local_ui_elements_to_show = self.initial_ui_elements_to_hide
+        self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
+        self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
+        self.motor =  StepperMotor(GPIOPin=12)
 
 
 

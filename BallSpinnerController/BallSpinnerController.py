@@ -102,7 +102,6 @@ class BallSpinnerController():
                     self.secMotor2.turnOffMotor()   
                 data["estop"] = False
             await asyncio.sleep(1)
-    
     async def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
 
@@ -116,7 +115,7 @@ class BallSpinnerController():
                 print("Sensors Turned on")
             except ValueError:
                 self.data['error_text'] = "I2C Not Detected, please Check Wifi"
-                currentSenorsOn = False
+                self.currentSenorsOn = False
 
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
@@ -169,7 +168,7 @@ class BallSpinnerController():
             print("Handling SmartDot:")
             def accelDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x41]) # Send Sensor Data for XL  
+                                        0x00, 0x13, SensorType.SD_XL]) # Send Sensor Data for XL  
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
@@ -183,45 +182,33 @@ class BallSpinnerController():
 
             def magDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x4D]) # Send B_A_SD_SENSOR_DATA for MG
+                                        0x00, 0x13, SensorType.SD_MG]) # Send B_A_SD_SENSOR_DATA for MG
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
                     print("Sending Mag")
-                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
-                    #p_msg = MsgType.name_from_value(bytesData[0])
-                    #self.data["message_type"] = p_msg
-                    #self.data["protocol_queue"].put(p_msg)
-             
                 except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopMag()
             
             def gyroDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x47]) # Send B_A_SD_SENSOR_DATA for XL
+                                        0x00, 0x13, SensorType.SD_GY]) # Send B_A_SD_SENSOR_DATA for XL
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
-                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
-                    #p_msg = MsgType.name_from_value(bytesData[0])
-                    #self.data["message_type"] = p_msg
-                    #self.data["protocol_queue"].put(p_msg)
              
                 except Exception: # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopGyro()
 
             def lightDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x4C])
+                                        0x00, 0x13, SensorType.SD_LT])
                 bytesData.extend(dataBytes)
                 #Add 0's to "Y and Z values"
                 bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
                 try:
                     self.commsChannel.sendall(bytesData)
-                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
-                    #p_msg = MsgType.name_from_value(bytesData[0])
-                    #self.data["message_type"] = p_msg
-                    #self.data["protocol_queue"].put(p_msg)
+                    
                 except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
                     print(f"Error Occured Somewhere in BSC: {e}")
                     self.smartDot.stopLight()
@@ -230,8 +217,7 @@ class BallSpinnerController():
            
 
             self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
-            #Instantly Setting the Start Configs for the 9DOF's to skip implementation
-
+            
             self.smartDot.startMag()
             self.smartDot.startAccel()
             self.smartDot.startGyro() 
@@ -525,6 +511,7 @@ class BallSpinnerController():
 
                 await asyncio.sleep(1)
 
+        await asyncio.sleep(1)
     async def tCPscanAll(self, debugMode):
         #Wait until Application receives Start Scanner Message
         await self.startScanner.wait()

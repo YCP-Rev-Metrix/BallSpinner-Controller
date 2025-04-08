@@ -5,6 +5,8 @@ from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
 import random
 import queue
 from BallSpinnerController.StepperMotor import StepperMotor
+import asyncio
+
 class HMI:
     def __init__(self, data):
         
@@ -518,6 +520,7 @@ class HMI:
     def emergency_stop_action(self):
         self.is_emergency_stopped = True
         self.data["error_text"] = f"Emergency Stopped motor"
+        self.data["estop"] = True
         self.motor.turnOffMotor()
         print("Emergency Stopped Motor")
 

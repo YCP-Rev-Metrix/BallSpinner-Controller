@@ -50,7 +50,8 @@ if __name__ == "__main__":
             "title": "Ball Spinner Controller GUI",
             "configure": 'dodgerblue2',  # Set the background color of the window
             "error_text": "",
-            "i": 0
+            "i": 0,
+            "estop": False,
     }
         
     # Create threads for the UI and the other loop

@@ -95,6 +95,12 @@ class BallSpinnerController():
             #print("########## HMI Communication Occurring ##########")
             if data["close_bsc"] is True:
                 self.stop_server()
+            if data["estop"] is True:
+                if self.PrimMotor is not None:# and self.secMotor1 and self.secMotor2:
+                    self.PrimMotor.turnOffMotor()
+                    self.secMotor1.turnOffMotor()
+                    self.secMotor2.turnOffMotor()   
+                data["estop"] = False
             await asyncio.sleep(1)
     
     async def socketHandler(self, ipAddr):    
@@ -503,17 +509,17 @@ class BallSpinnerController():
                 
                 # bytesData.extend(motorEncoder.readData()) 
                 m1cData = self.motorCurrentSensor1.readData()
-                self.data['motor_currents'][0] = "%.1f " % m1cData
+                self.data['motor_currents'][0] = "%.2f " % m1cData
                 print("CurrentSensor 1: %f" % m1cData) 
                 #This will Be to Send Current Sensor Data to BSA
 
                 m2cData = self.motorCurrentSensor2.readData()
-                self.data['motor_currents'][1] = m2cData
+                self.data['motor_currents'][1] ="%.2f " % m2cData
                 print("CurrentSensor 2: %f" % m2cData) 
                 #This will Be to Send Current Sensor Data to BSA
 
                 m3cData = self.motorCurrentSensor3.readData()
-                self.data['motor_currents'][2] = m3cData
+                self.data['motor_currents'][2] = "%.2f " % m3cData
                 print("CurrentSensor 3: %f" % m3cData) 
                 #This will Be to Send Current Sensor Data to BSA
 

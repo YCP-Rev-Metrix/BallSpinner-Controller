@@ -488,27 +488,42 @@ class BallSpinnerController():
     async def sensorHandler(self):
         while True: # Allow for thread to loop when repeated Start
 
-            #motorEncoder = AuxSensorSimulator(None)
-            while(self.currentSenorsOn): #runs until Sensors are
-                # bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                #                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
-                
+            while(self.currentSenorsOn): #runs until Sensors are turned off
+               
                 # bytesData.extend(motorEncoder.readData()) 
                 m1cData = self.motorCurrentSensor1.readData()
+               
                 self.data['motor_currents'][0] = "%.2f " % m1cData
-                print("CurrentSensor 1: %f" % m1cData) 
-                #This will Be to Send Current Sensor Data to BSA
+                #print("CurrentSensor 1: %f" % m1cData) 
+               
+                #Send data to BSA
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                        0x00, 0x13, SensorType.C1_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                bytesData.extend(struct.pack('<f', m1cData))
+                print("Sending C1 to BSA")
 
                 m2cData = self.motorCurrentSensor2.readData()
+                
                 self.data['motor_currents'][1] ="%.2f " % m2cData
-                print("CurrentSensor 2: %f" % m2cData) 
-                #This will Be to Send Current Sensor Data to BSA
-
+                #print("CurrentSensor 2: %f" % m2cData) 
+                
+                #Send data to BSA
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                        0x00, 0x13, SensorType.C2_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                bytesData.extend(struct.pack('<f', m2cData))
+                print("Sending C2 to BSA")
+                
                 m3cData = self.motorCurrentSensor3.readData()
                 self.data['motor_currents'][2] = "%.2f " % m3cData
-                print("CurrentSensor 3: %f" % m3cData) 
+                #print("CurrentSensor 3: %f" % m3cData) 
                 #This will Be to Send Current Sensor Data to BSA
-
+                
+                #Send data to BSA
+                bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                        0x00, 0x13, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                bytesData.extend(struct.pack('<f', m3cData))
+                print("Sending C3 to BSA")
+                
                 await asyncio.sleep(1)
 
         await asyncio.sleep(1)

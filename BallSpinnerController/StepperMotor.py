@@ -23,18 +23,23 @@ class StepperMotor(iMotor):
 
         #Configure GPIO Pin
         GPIO.setwarnings(False)
-        GPIO.setmode(GPIO.BOARD)
+        #GPIO.setmode(GPIO.BCM)
+        GPIO.setmode(GPIO.BCM)
         
         GPIO.setup(GPIOPin, GPIO.OUT)
         #1kHz
         self.PWM : GPIO.PWM = GPIO.PWM(GPIOPin, 400)
         #Declare on/off State (0 = Off; 1 = On)
         self.state = False
+        self.rpm = 0
 
     def turnOnMotor(self, rpm = 1):
         if not self.state:
-            self.PWM.ChangeFrequency(rpm * 400)
-            self.PWM.start(50)
+            if int(rpm) != 0:
+                self.PWM.ChangeFrequency(rpm * 400)
+                self.PWM.start(50)
+                self.rpm = rpm
+
             self.state = True
 
         else:
@@ -48,8 +53,14 @@ class StepperMotor(iMotor):
         else:
             print("Unable to Stop Motor: Motor is Not Running")
             
-    def changeSpeed(self, rpm : int):
-        self.PWM.ChangeFrequency(rpm * 400)
+    def changeSpeed(self, rpm : float):
+        self.rpm = rpm
+        if rpm > 0:
+            if self.rpm == 0.0 :
+                self.turnOnMotor(self.rpm)
+            self.PWM.ChangeFrequency(rpm * 400 / 60)
+            self.rpm = rpm
+
 
    
         
@@ -57,6 +68,5 @@ class StepperMotor(iMotor):
     def rampUp():
         pass
 
-    def turnOffMotor():
-        pass
+   
 

@@ -33,6 +33,7 @@ class MetaMotion(iSmartDot):
         
     def __init__(self, MAC_Address="", commChannel=None, autoConnect=False):
         self.commsChannel = commChannel
+        self._MAC_ADDRESS = MAC_Address
         if autoConnect:
             self.connect(MAC_Address)
     

@@ -1,14 +1,21 @@
-import tkinter as tk
-import threading
 from BallSpinnerController import BallSpinnerController
 from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
+from BallSpinnerController.Motors.StepperMotor import StepperMotor
+from BallSpinnerController.SmartDots.iSmartDot import iSmartDot
+from BallSpinnerController.SmartDots.MetaMotion import MetaMotion
+from BallSpinnerController.SmartDots.SmartDotEmulator import SmartDotEmulator
+from mbientlab.warble import BleScanner
+import tkinter as tk
+import six
+import threading
 import random
 import queue
-from BallSpinnerController.Motors.StepperMotor import StepperMotor
 import asyncio
+import threading
 import time
+
 class HMI:
-    def __init__(self, data):
+    def __init__(self, data, fullscreen=True):
         
         #This is our shared data dictionary that we check for changes in 
         self.data = data
@@ -31,13 +38,14 @@ class HMI:
         self.bsc = None
 
 ################################################### Initialize UI ###################################################\
-        self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
-        # Remove window decorations (title bar, borders)
-        self.root.overrideredirect(True)
-        # Set window size to full screen
+        if fullscreen:
+            self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
+            # Remove window decorations (title bar, borders)
+            self.root.overrideredirect(True)
+            # Set window size to full screen
+            # Keep window on top (optional)
+            self.root.attributes("-topmost", True)
 
-        # Keep window on top (optional)
-        self.root.attributes("-topmost", True)
         # self.root.geometry("800x480")
         self.screen_width = 800
         self.screen_height = 480
@@ -76,6 +84,7 @@ class HMI:
         #Local only elements
         self.motor_controller_window = self.create_motor_controller_window()
         self.motor = None
+        self.sd_connect_window = self.create_SD_connect_window()
         #List of elements to initially hide
 
         #initialize stack for back button
@@ -293,6 +302,142 @@ class HMI:
         label.grid(row=0, column=0) 
         self.protocol_labels.append(label)
 
+################################################### Local SD Connect ###################################################
+    def create_SD_connect_window(self):
+        x = 575
+        y = 125
+        
+        # Create a frame inside self.frame
+        frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge", width = 200, height = 200)
+        frame.place(x=x, y=y)
+        frame.pack_propagate(False) #Don't shrink frame to content
+
+        self.connect_sd = tk.Button(frame,text="Scan SD", command = self.handle_smart_dot_btn)
+        self.connect_sd.pack(in_=frame)
+
+        self.connect_sd_buttons = [self.connect_sd]
+        # self.choose_sd1 = tk.Button(frame, text=f"blah",  font=("Arial", 10,), command=lambda: self.connect_to_chosen_SD(0))
+        # self.choose_sd1.pack(in_=frame)
+        # self.choose_sd2 = tk.Button(frame, text=f"blah",  font=("Arial", 10,), command=lambda: self.connect_to_chosen_SD(1))
+        # self.choose_sd2.pack(in_=frame)
+        # self.choose_sd3 = tk.Button(frame, text=f"blah",  font=("Arial", 10,), command=lambda: self.connect_to_chosen_SD(2))
+        # self.choose_sd3.pack(in_=frame)
+        # self.choose_sd4 = tk.Button(frame, text=f"blah",  font=("Arial", 10,), command=lambda: self.connect_to_chosen_SD(3))
+        # self.choose_sd4.pack(in_=frame)
+        #used to track which stage of connection we are in
+        #0 means we have just clicked scan, it will get incremented to 1. if we click button again it becomes 2 
+        #and the scan will see and stop
+        self.sd_cmd_idx = 0
+        self.sd_thread = None
+       # self.smartDot = None
+        return frame
+    def unpack_connect_elements(self):
+        for i in self.connect_sd_buttons:
+            print(f"unpacking {i}")
+            i.pack_forget()
+        self.pack_connected_elements()
+    def pack_connected_elements(self):
+        self.sd_connected_label = tk.Label(self.sd_connect_window, text=f"Connected to {self.smartDot._MAC_ADDRESS}", font =("Arial",10))
+        self.sd_connected_label.pack(in_=self.sd_connect_window)
+
+        self.local_SD_config = self.create_local_SD_window()
+    def handle_smart_dot_btn(self):
+        if self.sd_thread is None:
+            self.sd_thread = threading.Thread(target=self.scanAll)
+            self.sd_thread.start()
+        # availDevices = self.scanAll()
+        self.sd_cmd_idx += 1
+    def connect_to_chosen_SD(self, btn_idx):
+        #Jank way to grab Correct MAC Address: Creates Keys and gra
+        print(f"Button index {btn_idx}")
+        smartDotMAC = tuple(self.availDevicesType.keys())[btn_idx]
+        smartDot = self.availDevicesType[smartDotMAC]()
+        print("Select SmartDot to Connect to:")
+        self.smartDot = MetaMotion(tuple(self.availDevices.keys())[btn_idx])
+        smartDotConnect = self.smartDot.connect(smartDotMAC)
+        self.sd_cmd_idx += 1
+
+        # Connect to Selected SmartDot Module
+       # while not smartDotConnect:
+            # print("Unable to Connect to ")
+            # print("Press ^C to Stop Scanning SmartDot Module")
+            # availDevices = asyncio.run(self.scanAll())
+            # print("Select SmartDot to Connect to:")
+            # consInput = input()
+            # smartDot = MetaMotion(tuple(availDevices.keys())[int(consInput)])
+    def scanAll(self):
+        self.availDevices = {}
+        self.availDevicesType = {}
+
+        self.smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
+
+        self.availDevices["11:11:11:11:11:11"] = "smartDotSimulator" 
+        self.availDevicesType["11:11:11:11:11:11"] = SmartDotEmulator
+
+        #self.mode = "Scanning"
+        selection = -1
+        #Continuously rescans for MetaWear Devices
+        print("scanning for devices...")
+
+        #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
+        def handler(result):
+            for listedConnect in range(len(self.smartDot)):
+                if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
+                    self.availDevices[result.mac] = result.name
+                    if(isinstance(self.smartDot[listedConnect],MetaMotion)):
+                            self.availDevicesType[result.mac] = MetaMotion
+
+        BleScanner.set_handler(handler)
+        BleScanner.start()
+        
+        try :
+            i = 0
+            while True: 
+                #print(f"cmd idx: {self.sd_cmd_idx}")
+                # #update list every 1s
+                time.sleep(1.0)  
+                #print all BLE devices found and append to connectable list                
+                count = 0
+                for address, name in six.iteritems(self.availDevices):
+                    if count >= i :
+                        print("[%d] %s (%s)" % (i, address, name))
+                        btn = tk.Button(self.sd_connect_window, text="[%d] %s (%s)" % (i, address, name),  font=("Arial", 8,), command=lambda i=i: self.connect_to_chosen_SD(i))
+                        btn.pack(in_=self.sd_connect_window)
+                        self.connect_sd_buttons.append(btn)
+                        i += 1
+                    count += 1
+                if self.sd_cmd_idx > 1:
+                    BleScanner.stop()
+                    print("exiting the scan")
+                    self.unpack_connect_elements()
+                    break# self.availDevices
+        except : #Called when KeyInterrut ^C is called
+            BleScanner.stop()
+            print("exiting the scan")
+            self.unpack_connect_elements()
+            return# self.availDevices
+    ############### Local mode SD config window ###############
+    def create_local_SD_window(self):
+        sd_frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge")
+
+        # Add labels inside the SD window
+        self.local_sd_title = tk.Label(sd_frame, text="SD Information", font=("Arial", 14, "bold"), bg="lightgray")
+        self.local_sd_xl = tk.Label(sd_frame, text="XL: --", bg="lightgray")
+        self.local_sd_gy = tk.Label(sd_frame, text="GY: --", bg="lightgray")
+        self.local_sd_mg = tk.Label(sd_frame, text="MG: --", bg="lightgray")
+        self.local_sd_lt = tk.Label(sd_frame, text="LT: --", bg="lightgray")
+
+        # Pack elements inside the SD window
+        self.local_sd_title.pack(in_=sd_frame, pady=5)
+        self.local_sd_xl.pack(in_=sd_frame, pady=5)
+        self.local_sd_gy.pack(in_=sd_frame, pady=5)
+        self.local_sd_mg.pack(in_=sd_frame, pady=5)
+        self.local_sd_lt.pack(in_=sd_frame, pady=5)
+
+
+        # Place the SD window on the right side
+        sd_frame.pack(in_=self.sd_connect_window)
+        return sd_frame
 ################################################### Local Motor Controller ###################################################
     def create_motor_controller_window(self):
         x = 200
@@ -522,9 +667,8 @@ class HMI:
         self.data["error_text"] = f"Emergency Stopped motor"
         self.data["estop"] = True
         self.motor.turnOffMotor()
-        time.sleep(2)
-        self.motor.turnOnMotor(0)
-
+        # time.sleep(1)
+        self.motor.turnOnMotor(0) #rpm 0 
         print("Emergency Stopped Motor")
 
     def close_window(self):

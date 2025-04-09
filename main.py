@@ -13,7 +13,7 @@ def BSC_thread():
 
 #In order to know whether or not the HMI can successfully run, we create an HMI thread class that stores an exception.
 class HMIThread(threading.Thread):
-    def __init__(self, shared_data):
+    def __init__(self, shared_data, fullscreen=True):
         super().__init__()
         self.shared_data = shared_data
         self.exception = False  # This will track if an exception occurs
@@ -23,7 +23,7 @@ class HMIThread(threading.Thread):
     def run(self):
         try:
             # UI initialization and method calls
-            ui = HMI(self.shared_data)
+            ui = HMI(self.shared_data, fullscreen)
             ui.check_for_updates()
             ui.run()
         except Exception as e:
@@ -55,7 +55,11 @@ if __name__ == "__main__":
     }
         
     # Create threads for the UI and the other loop
-    hmi_thread = HMIThread(shared_data)
+    fullscreen = True
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "1":
+            fullscreen = False
+    hmi_thread = HMIThread(shared_data, fullscreen)
 
     # Start the HMI thread first
     print("Starting the HMI thread")

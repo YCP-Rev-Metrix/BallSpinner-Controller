@@ -6,7 +6,7 @@ import random
 import queue
 from BallSpinnerController.Motors.StepperMotor import StepperMotor
 import asyncio
-
+import time
 class HMI:
     def __init__(self, data):
         
@@ -522,6 +522,9 @@ class HMI:
         self.data["error_text"] = f"Emergency Stopped motor"
         self.data["estop"] = True
         self.motor.turnOffMotor()
+        time.sleep(2)
+        self.motor.turnOnMotor(0)
+
         print("Emergency Stopped Motor")
 
     def close_window(self):

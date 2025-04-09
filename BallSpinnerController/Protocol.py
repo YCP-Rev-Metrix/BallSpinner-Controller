@@ -38,6 +38,37 @@ class MsgType:
     def name_from_value(cls, value):
         return cls._reverse_mapping.get(value)
     
+class SensorType:
+    SD_XL = 0x41
+
+    SD_GY = 0x47
+
+    SD_MG = 0x4D
+
+    SD_MG = 0x4D
+
+    SD_LT = 0x4C
+    
+    SD_Test = 0x54
+
+
+    C1_SNSR = 0x43
+
+    C2_SNSR = 0x56
+
+    C3_SNSR = 0x52
+
+    #Motor Encoders    
+    M1_ENC = 0x6D
+
+    M2_ENC = 0x6F
+
+    M3_ENC = 0x74
+
+
+    _reverse_mapping = {value: name for name, value in locals().items() if not name.startswith('_') and not callable(value)}
+
+
 class ErrType:
     pass
 

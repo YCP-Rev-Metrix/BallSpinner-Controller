@@ -6,6 +6,14 @@ import socket
 import RPi.GPIO as GPIO
 import multiprocessing 
 import struct
+import busio
+import board
+from adafruit_ads1x15.analog_in import AnalogIn
+import adafruit_ads1x15.ads1115 as ads
+from abc import ABCMeta, abstractmethod
+from BallSpinnerController.AuxSensors.iAuxSensor import iAuxSensor
+from BallSpinnerController.AuxSensors.CurrentSensors import CurrentSensor
+
 '''
 #Set PWM Pin Motor is Connected to 
 GPIOPin = 35
@@ -180,7 +188,120 @@ class restartTest:
         sleep(4)
         self.commsPort.sendall(bytearray([0x08, 0x00, 0x03, 0x0A, 0x0A, 0x0A]))
 
-MMS = MetaMotion()
-print(MMS.sendConfigSettings())
-#smartDot = SmartDotEmulator()
-#smartDot.sendConfigSettings()
+def readCurrentSensor():
+    
+    i2cConfig = busio.I2C(board.SCL, board.SDA)
+    adc = ads.ADS1115(i2cConfig)
+    ads.gain = 1
+    
+    chan = AnalogIn(adc, ads.P0)
+    while True:
+        print(chan.voltage)
+
+def tryCurrent():
+    try:
+        sensor = CurrentSensor(1)
+        sensor.readData()
+
+    except ValueError:
+        print("Caught you bitchs ")
+
+def testAbsEncoder():
+    import serial
+    import time
+
+    # Configure UART serial connection
+    SERIAL_PORT = "/dev/serial0"  # Adjust if using a different UART port
+    BAUD_RATE = 115200  # Ensure this matches the encoder's settings
+
+    def calculate_rpm(velocity_bytes):
+        """Convert the received velocity bytes to RPM."""
+        if len(velocity_bytes) < 2:
+            return None
+        velocity = int.from_bytes(velocity_bytes, byteorder="big", signed=True)
+        return velocity
+
+    def read_rpm():
+        """Reads RPM from AMT212C-V encoder over RS485-UART."""
+        try:
+            with serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1) as ser:
+                # Command to request velocity (Modify based on AMT212C-V protocol)
+                request_cmd = bytes([0x52, 0x56])  # Example: 'RV' command (adjust as per datasheet)
+                ser.write(request_cmd)
+                time.sleep(0.1)
+
+                # Read response (Modify based on actual response format)
+                response = ser.read(2)  # Assuming 2 bytes for velocity data
+                if response:
+                    rpm = calculate_rpm(response)
+                    print(f"RPM: {rpm}")
+                else:
+                    print("No response received.")
+
+        except serial.SerialException as e:
+            print(f"Serial error: {e}")
+
+    if __name__ == "__main__":
+        while True:
+            read_rpm()
+            time.sleep(1)  # Adjust sampling rate as needed
+
+import pigpio
+import time
+
+# GPIO pins
+PIN_A = 15
+PIN_B = 27
+PIN_I = 14
+
+# Init
+pi = pigpio.pi()
+if not pi.connected:
+    raise RuntimeError("Failed to connect to pigpio daemon")
+
+# Encoder state
+position = 0
+last_index_time = None
+
+# Callback functions
+def pulse_a(gpio, level, tick):
+    global position
+    b_level = pi.read(PIN_B)
+    if b_level == 1:
+        position += 1
+    else:
+        position -= 1
+
+def index_callback(gpio, level, tick):
+    global last_index_time, position
+    now = time.time()
+    if last_index_time is not None:
+        dt = now - last_index_time
+        rpm = 60 / dt
+        print(f"RPM: {rpm:.2f}, Position since last index: {position}")
+    last_index_time = now
+    position = 0  # Reset position per revolution if you want
+
+# Set up GPIOs
+pi.set_mode(PIN_A, pigpio.INPUT)
+pi.set_mode(PIN_B, pigpio.INPUT)
+pi.set_mode(PIN_I, pigpio.INPUT)
+
+pi.set_pull_up_down(PIN_A, pigpio.PUD_UP)
+pi.set_pull_up_down(PIN_B, pigpio.PUD_UP)
+pi.set_pull_up_down(PIN_I, pigpio.PUD_UP)
+
+# Set callbacks
+cb_a = pi.callback(PIN_A, pigpio.RISING_EDGE, pulse_a)
+cb_i = pi.callback(PIN_I, pigpio.RISING_EDGE, index_callback)
+
+# Keep running
+try:
+    while True:
+        time.sleep(1)
+except KeyboardInterrupt:
+    print("Exiting...")
+finally:
+    cb_a.cancel()
+    cb_i.cancel()
+    pi.stop()

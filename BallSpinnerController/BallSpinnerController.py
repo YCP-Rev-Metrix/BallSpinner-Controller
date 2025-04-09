@@ -107,7 +107,8 @@ class BallSpinnerController():
     async def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
 
-        
+            self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
+
             #turn on Sensors
             try:
                 self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
@@ -494,8 +495,9 @@ class BallSpinnerController():
            
     async def sensorHandler(self):
         while True: # Allow for thread to loop when repeated Start
-
-            while(self.currentSenorsOn or self.motorEncodersOn): #runs until Sensors are turned off
+            
+            #Make sure that the application handshake is completed before sending Auxillary Sensor Data
+            while(self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION and (self.currentSenorsOn or self.motorEncodersOn)): #runs until Sensors are turned off
                
                 if self.currentSenorsOn:
                     # bytesData.extend(motorEncoder.readData()) 
@@ -508,6 +510,7 @@ class BallSpinnerController():
                     bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
                                             0x00, 0x13, SensorType.C1_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
                     bytesData.extend(struct.pack('<f', m1cData))
+                    self.commsChannel.sendall(bytesData)
                     print("Sending C1 to BSA")
 
                     m2cData = self.motorCurrentSensor2.readData()
@@ -530,6 +533,7 @@ class BallSpinnerController():
                     bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
                                             0x00, 0x13, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
                     bytesData.extend(struct.pack('<f', m3cData))
+                    self.commsChannel.sendall(bytesData)
                     print("Sending C3 to BSA")
 
                 if self.motorEncodersOn:
@@ -539,6 +543,8 @@ class BallSpinnerController():
                                             0x00, 0x13, SensorType.M1_ENC]) # Send B_A_SD_SENSOR_DATA for MG
                     bytesData.extend(struct.pack('<f', me1cData))
                     print("Sending ME1 to BSA")
+                    self.commsChannel.sendall(bytesData)
+
 
                 await asyncio.sleep(1)
 

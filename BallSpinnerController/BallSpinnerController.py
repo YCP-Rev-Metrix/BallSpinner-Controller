@@ -508,11 +508,11 @@ class BallSpinnerController():
                 
                     #Send data to BSA
                     bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                            0x00, 0x13, SensorType.C1_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                                            0x00, 0x0C, SensorType.C1_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
                     bytesData.extend(struct.pack('<f', m1cData))
                     self.commsChannel.sendall(bytesData)
-                    print("Sending C1 to BSA")
-
+                    
                     m2cData = self.motorCurrentSensor2.readData()
                     
                     self.data['motor_currents'][1] ="%.2f " % m2cData
@@ -520,9 +520,10 @@ class BallSpinnerController():
                     
                     #Send data to BSA
                     bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                            0x00, 0x13, SensorType.C2_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                                            0x00, 0x0C, SensorType.C2_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+
                     bytesData.extend(struct.pack('<f', m2cData))
-                    print("Sending C2 to BSA")
                     
                     m3cData = self.motorCurrentSensor3.readData()
                     self.data['motor_currents'][2] = "%.2f " % m3cData
@@ -531,21 +532,20 @@ class BallSpinnerController():
                     
                     #Send data to BSA
                     bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                            0x00, 0x13, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                                            0x00, 0x0C, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
                     bytesData.extend(struct.pack('<f', m3cData))
                     self.commsChannel.sendall(bytesData)
-                    print("Sending C3 to BSA")
-
+                    
                 if self.motorEncodersOn:
                     me1cData = self.motorEncoder1.readData()
                     print("Motor 1 RPM %.2f" % self.motorEncoder1.readData())
                     bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                            0x00, 0x13, SensorType.M1_ENC]) # Send B_A_SD_SENSOR_DATA for MG
+                                            0x00, 0x0C, SensorType.M1_ENC]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
                     bytesData.extend(struct.pack('<f', me1cData))
-                    print("Sending ME1 to BSA")
                     self.commsChannel.sendall(bytesData)
-
-
+                    
                 await asyncio.sleep(1)
 
             await asyncio.sleep(1)

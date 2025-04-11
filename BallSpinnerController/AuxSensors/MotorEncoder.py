@@ -18,7 +18,7 @@ class MotorEncoder(iAuxSensor):
             raise RuntimeError("Failed to connect to pigpio daemon")
 
         # Encoder state
-        self.position = 0
+        self.pulses = 0
         self.last_index_time = None
         
         # Set up GPIOs
@@ -33,25 +33,27 @@ class MotorEncoder(iAuxSensor):
         # Set callbacks
         cb_a = self.pi.callback(PIN_A, pigpio.RISING_EDGE, self.pulse_a)
         cb_i = self.pi.callback(PIN_I, pigpio.RISING_EDGE, self.index_callback)
+
+        self.CPR = 500
         self.rpm = 0
 
     # Callback functions
-    def pulse_a(self, gpio, level, tick):
-        self.position
+    def pulse_a(self):
         b_level = self.pi.read(self.PIN_B)
         if b_level == 1:
-            self.position += 1
+            self.pulses += 1
         else:
-            self.position -= 1
+            self.pulses -= 1
 
-    def index_callback(self, gpio, level, tick):
+    def index_callback(self):
+        #RPM = (Pulses / Time Interval) * 60 / Pulses Per Revolution (PPR)
         now = time.time()
         if self.last_index_time is not None:
             dt = now - self.last_index_time
-            self.rpm = 60 / dt
-            print(f"RPM: {self.rpm:.2f}, Position since last index: {self.position}")
+            self.rpm = (self.pulses / dt) * 60 / self.CPR
+            print(f"RPM: {self.rpm:.2f}, Position since last index: {self.pulses}")
         self.last_index_time = now
-        self.position = 0  # Reset position per revolution if you want
+        self.pulses = 0  # Reset position per revolution if you want
 
     
     def stopSenosr(self):

@@ -31,12 +31,15 @@ class MetaMotion(iSmartDot):
     def UUID(self) -> str:
         return "326a9000-85cb-9195-d9dd-464cfbbae75a"
         
-    def __init__(self, MAC_Address="", commChannel=None, autoConnect=False):
+    def __init__(self, MAC_Address="", commChannel=None, autoConnect=False, is_local=False):
         self.commsChannel = commChannel
         self._MAC_ADDRESS = MAC_Address
         if autoConnect:
             self.connect(MAC_Address)
-    
+
+        #temp rig to create a different data capture method for local mode HMI
+        self.is_local_mode = is_local
+        self.XL_data = None
     def setCommsPort(self, connection): #Check if we need
         self.commsChannel = connection
 
@@ -90,27 +93,36 @@ class MetaMotion(iSmartDot):
         if self.AccelSampleCount == 0:
             self.prevAccelEpoch = data.contents.epoch
         timeStamp = (data.contents.epoch - self.prevAccelEpoch)/1000 #Epoch is given in ms
-        
-        #Pack Sample Count into 3 Byte Big Endian Int
-        self.AccelSampleCount += 1
-        sampleCountInBytes = struct.pack('>I',self.AccelSampleCount )[1:4]
-        
-        # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
-        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
-        xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
-        yValInBytes : bytearray = struct.pack('<f', parsedData.y)
-        zValInBytes : bytearray = struct.pack('<f', parsedData.z)
-        
-        mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+        if not self.is_local_mode:
+            #Pack Sample Count into 3 Byte Big Endian Int
+            self.AccelSampleCount += 1
+            sampleCountInBytes = struct.pack('>I',self.AccelSampleCount )[1:4]
+            
+            # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
+            timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+            xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
+            yValInBytes : bytearray = struct.pack('<f', parsedData.y)
+            zValInBytes : bytearray = struct.pack('<f', parsedData.z)
+            
+            mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
 
-        try: # Check if TCP connection is set up, if not, just print xyz values in terminal
-            self.accelDataSig(mess)
-            #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            try: # Check if TCP connection is set up, if not, just print xyz values in terminal
+                self.accelDataSig(mess)
+                #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
 
-        except Exception as e:
-            print(parsedData)
-            print(e)
-
+            except Exception as e:
+                print(parsedData)
+                print(e)
+        else:
+            time_val = time.time() - self.xl_start_time
+            #print(f"{time.time()} - {self.xl_start_time} = {time_val}")
+            self.XL_data ={
+                'timestamp':time_val,
+                'x':parsedData.x, 
+                'y':parsedData.y, 
+                'z':parsedData.z
+            }
+            #print(f"XL_DATA: {self.XL_data}")
 
     def magDataHandler(self, ctx, data):
         #Parse data into Cartesian Values
@@ -224,6 +236,7 @@ class MetaMotion(iSmartDot):
 
         print("Subscribing to acceleration data")
         self.accelSignal = libmetawear.mbl_mw_acc_get_acceleration_data_signal(self.device.board)
+        self.xl_start_time = time.time()
         libmetawear.mbl_mw_datasignal_subscribe(self.accelSignal, None, self.accelCallback)
            
         print("Enabling acceleration sampling")

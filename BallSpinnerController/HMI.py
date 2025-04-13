@@ -37,8 +37,9 @@ class HMI:
         self.active_motor = None  # Track which motor's popup is active
         self.emergency_stop_clicks = 0
         self.is_emergency_stopped = False
-
+        self.smartDot = None
         self.bsc = None
+        self.graph_xl = None
 
 ################################################### Initialize UI ###################################################\
         if fullscreen:
@@ -257,6 +258,17 @@ class HMI:
         while not self.data["protocol_queue"].empty():
             self.update_protocol_list(self.data["protocol_queue"].get())
 
+        #Update SmartDot Data Queues
+        if self.smartDot is not None: #and (self.smartDot is MetaMotion or self.smartDot is SmartDotEmulator):
+            #print(type(self.smartDot))
+            if isinstance(self.smartDot, MetaMotion):
+                if self.graph_xl is not None:
+                    self.graph_xl.queue.put(self.smartDot.XL_data)
+               
+
+            # print("Attempting to put data in the queue")
+               
+            
         self.after_id = self.root.after(self.ui_update_frequency, self.check_for_updates)
 
 ################################################### Basic Data Labels ###################################################
@@ -372,7 +384,7 @@ class HMI:
         print(f"Button index {btn_idx}")
         smartDotMAC = tuple(self.availDevicesType.keys())[btn_idx]
         smartDot = self.availDevicesType[smartDotMAC]()
-        self.smartDot = MetaMotion(tuple(self.availDevices.keys())[btn_idx])
+        self.smartDot = MetaMotion(tuple(self.availDevices.keys())[btn_idx], is_local=True)
         smartDotConnect = self.smartDot.connect(smartDotMAC)
         self.sd_cmd_idx += 1
 
@@ -527,24 +539,15 @@ class HMI:
             ("MG XYZ 3", 1, 0),
             ("LT XYZ 4", 1, 1),
         ]
-        # data_queues = [
-        #     self.XL_data_queue,
-        #     self.GY_data_queue,
-        #     self.MG_data_queue,
-        #     self.LT_data_queue,
-        # ]
         data_queues = [
             Queue(),
             Queue(),
             Queue(),
-            Queue(),
+            Queue()
         ]
-        #function from the animated_graph.py file
-        simulate_data_feed(data_queues[0])
-        simulate_data_feed(data_queues[1])      
-        simulate_data_feed(data_queues[2])
-        simulate_data_feed(data_queues[3])
+
         graph_update_speed = 150
+        self.smartDot.startAccel()
         for i, (text, row, col) in enumerate(labels):
             # Create subframe for label + graph
             subframe = tk.Frame(graph_frame)
@@ -555,8 +558,8 @@ class HMI:
             label.grid(row=0, column=0, pady=(0, 5))
 
             # Add graph below the label
-            graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed) 
-            graph.canvas_widget.grid(row=1, column=0)
+        self.graph_xl = RealTimeGraph(subframe, data_queues[0], graph_update_speed) 
+        self.graph_xl.canvas_widget.grid(row=1, column=0)
         return graph_frame
 ################################################### Local Motor Controller ###################################################
     def create_motor_controller_window(self):
@@ -793,7 +796,8 @@ class HMI:
         print("Emergency Stopped Motor")
 
     def close_window(self):
-        self.root.destroy()
+        self.on_close()
+
         # Set the error text and update the error label
 
     #TODO: function for back button from main local or bsc screen    

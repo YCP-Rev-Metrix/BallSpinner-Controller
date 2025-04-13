@@ -7,16 +7,19 @@ import time
 from queue import Queue
 
 class RealTimeGraph:
-    def __init__(self, master, data_q, update_speed=100):
+    def __init__(self, master, data_q, update_speed=100, xl_config=None):
         self.master = master
         self.queue = data_q
         #master.title("Real-time XYZ Graph")
 
         dpi = 50  # Adjust as needed
-        figsize = (125 / dpi, 60 / dpi)  # (width_inches, height_inches)
+        figsize = (150 / dpi, 80 / dpi)  # (width_inches, height_inches)
 
         self.fig, self.ax = plt.subplots(figsize=figsize, dpi=dpi)
-        self.ax.set_ylim(-2, 2)
+        if xl_config != None:
+            pass 
+            #set the y lim to be that of the XL Range Parameter
+        self.ax.set_ylim(-2,2)
         self.x_data = []
         self.y_data = []
         self.z_data = []
@@ -42,16 +45,19 @@ class RealTimeGraph:
 
     def update_graph(self, i):
         # Pull all items from the queue
+        t = 0
         while not self.queue.empty():
+            #print(f"Metamotion queue address {self.queue}")
             data = self.queue.get()
+            print(f"data: {data}")
             t = data['timestamp']
             self.time_data.append(t)
             self.x_data.append(data['x'])
             self.y_data.append(data['y'])
             self.z_data.append(data['z'])
-
+            print(f"Data received: {data}")
         # Keep only the last 5 seconds of data
-        current_time = time.time()
+        current_time = t
         while self.time_data and self.time_data[0] < current_time - 5:
             self.time_data.pop(0)
             self.x_data.pop(0)

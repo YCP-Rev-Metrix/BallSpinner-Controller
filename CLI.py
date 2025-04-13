@@ -154,6 +154,8 @@ class CLI:
 
             else:
                 print("Invalid Input, Please Try Again\n")
+            
+        smartDot.disconnect()
 
     def motorCLI(self):
         print("----------------------")

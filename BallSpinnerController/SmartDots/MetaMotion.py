@@ -82,7 +82,8 @@ class MetaMotion(iSmartDot):
             self.GY_Range = 2
             
             self.MG_SampleRate = 10
-        
+
+            self.turnOnBlueLED()
             print("Connected to device")
             return True
     
@@ -242,6 +243,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_datasignal_unsubscribe(self.magSignal)
         
     def disconnect(self):
+        self.turnOffLED()
         self.device.disconnect()
       
     # Define a callback function to handle data

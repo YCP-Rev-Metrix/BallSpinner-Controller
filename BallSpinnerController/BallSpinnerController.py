@@ -535,7 +535,7 @@ class BallSpinnerController():
                                             0x00, 0x0C, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
                     bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
                     bytesData.extend(struct.pack('<f', m3cData))
-                    self.commsChannel.sendall(bytesData)
+#                    self.commsChannel.sendall(bytesData)
                     
                 if self.motorEncodersOn:
                     me1cData = self.motorEncoder1.readData()
@@ -545,7 +545,7 @@ class BallSpinnerController():
                     bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
                     bytesData.extend(struct.pack('<f', me1cData))
                     self.commsChannel.sendall(bytesData)
-                    
+                    print("Data Sent")
                 await asyncio.sleep(1)
 
             await asyncio.sleep(1)

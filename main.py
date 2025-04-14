@@ -45,10 +45,9 @@ if __name__ == "__main__":
             "sample_rates":["--:--","--:--","--:--","--:--"],
             "mode": "",
             "message_type": "",
-            "bg_color": 'dodgerblue2',
+            "bg_color": 'black',
             "geometry": "600x300",  # Set the window size to 600x300 pixels
             "title": "Ball Spinner Controller GUI",
-            "configure": 'dodgerblue2',  # Set the background color of the window
             "error_text": "",
             "i": 0,
             "estop": False,

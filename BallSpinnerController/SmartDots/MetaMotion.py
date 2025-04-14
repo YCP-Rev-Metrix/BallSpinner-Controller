@@ -39,7 +39,8 @@ class MetaMotion(iSmartDot):
 
         #temp rig to create a different data capture method for local mode HMI
         self.is_local_mode = is_local
-        self.XL_data = None
+        self.data_arr= [None,None,None,None]
+
     def setCommsPort(self, connection): #Check if we need
         self.commsChannel = connection
 
@@ -116,7 +117,7 @@ class MetaMotion(iSmartDot):
         else:
             time_val = time.time() - self.xl_start_time
             #print(f"{time.time()} - {self.xl_start_time} = {time_val}")
-            self.XL_data ={
+            self.data_arr[0] ={
                 'timestamp':time_val,
                 'x':parsedData.x, 
                 'y':parsedData.y, 
@@ -131,28 +132,35 @@ class MetaMotion(iSmartDot):
         # Set the Timestamps from the First Received Sample
         if self.MagSampleCount == 0:
             self.prevMagEpoch = data.contents.epoch
-
+        
         timeStamp = (data.contents.epoch - self.prevMagEpoch)/1000 #Epoch is given in ms
+        if not self.is_local_mode:
+            #Pack Sample Count into 3 Byte Big Endian Int
+            self.MagSampleCount += 1
+            sampleCountInBytes = struct.pack('>I',self.MagSampleCount )[1:4]
+            
+            # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
+            timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+            xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
+            yValInBytes : bytearray = struct.pack('<f', parsedData.y)
+            zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
-        #Pack Sample Count into 3 Byte Big Endian Int
-        self.MagSampleCount += 1
-        sampleCountInBytes = struct.pack('>I',self.MagSampleCount )[1:4]
-        
-        # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
-        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
-        xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
-        yValInBytes : bytearray = struct.pack('<f', parsedData.y)
-        zValInBytes : bytearray = struct.pack('<f', parsedData.z)
-
-        mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
-        
-        try: # Check if TCP connection is set up, if not, just print xyz values in terminal
-            self.magDataSig(mess)
-            #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
-        except Exception as e:
-            print(f"Unexpected error in MGDataHandler: {e}")
-            print(parsedData)
-
+            mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+            
+            try: # Check if TCP connection is set up, if not, just print xyz values in terminal
+                self.magDataSig(mess)
+                #print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            except Exception as e:
+                print(f"Unexpected error in MGDataHandler: {e}")
+                print(parsedData)
+        else:
+            time_val = time.time() - self.mg_start_time
+            self.data_arr[1] ={
+                'timestamp':time_val,
+                'x':parsedData.x, 
+                'y':parsedData.y, 
+                'z':parsedData.z
+            }
     def gyroDataHandler(self, ctx, data):
         #Parse data into Cartesian Values
         parsedData = parse_value(data)
@@ -162,47 +170,65 @@ class MetaMotion(iSmartDot):
             self.prevGyroEpoch = data.contents.epoch
 
         timeStamp = (data.contents.epoch - self.prevGyroEpoch)/1000 #Epoch is given in ms
+        if not self.is_local_mode:
+            #Pack Sample Count into 3 Byte Big Endian Int
+            self.GyroSampleCount+=1
+            sampleCountInBytes = struct.pack('>I',self.GyroSampleCount )[1:4]
+            
+            # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
+            timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+            xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
+            yValInBytes : bytearray = struct.pack('<f', parsedData.y)
+            zValInBytes : bytearray = struct.pack('<f', parsedData.z)
 
-        #Pack Sample Count into 3 Byte Big Endian Int
-        self.GyroSampleCount+=1
-        sampleCountInBytes = struct.pack('>I',self.GyroSampleCount )[1:4]
-        
-        # Pack Timestamp, and x,y,z into 4 Byte Little Endian Floats
-        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
-        xValInBytes : bytearray = struct.pack('<f', parsedData.x) 
-        yValInBytes : bytearray = struct.pack('<f', parsedData.y)
-        zValInBytes : bytearray = struct.pack('<f', parsedData.z)
-
-        mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
-        
-        try: # Check if TCP connection is set up, if not, just print in terminal
-            self.gyroDataSig(mess)
-           # print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
-        except Exception as e:
-            print(parsedData)
-            print(e)
-
+            mess = sampleCountInBytes + timeStampInBytes + xValInBytes + yValInBytes + zValInBytes
+            
+            try: # Check if TCP connection is set up, if not, just print in terminal
+                self.gyroDataSig(mess)
+            # print("Encoded Data " + xValInBytes.hex() + ' ' + yValInBytes.hex() + ' ' + zValInBytes.hex())
+            except Exception as e:
+                print(parsedData)
+                print(e)
+        else:
+            time_val = time.time() - self.gy_start_time
+            self.data_arr[2] ={
+                'timestamp':time_val,
+                'x':parsedData.x, 
+                'y':parsedData.y, 
+                'z':parsedData.z
+            }            
             
     def lightDataHandler(self, ctx, data):
         parsedData = parse_value(data)
         timeStamp = datetime.now().timestamp() - self.startLightTime
-        sampleCountInBytes = struct.pack('>I',self.LightSampleCount )[1:4]
-        self.LightSampleCount+=1
+        if not self.is_local_mode:
+            sampleCountInBytes = struct.pack('>I',self.LightSampleCount )[1:4]
+            self.LightSampleCount+=1
 
-        timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
-        valInBytes : bytearray = struct.pack('<f', parsedData) 
+            timeStampInBytes : bytearray = struct.pack("<f", timeStamp)
+            valInBytes : bytearray = struct.pack('<f', parsedData) 
 
-        mess = sampleCountInBytes + timeStampInBytes + valInBytes 
-        try:
-            self.lightDataSig(mess)
-        except Exception as e:
-            print(parsedData)
-            print(e)
+            mess = sampleCountInBytes + timeStampInBytes + valInBytes 
+            try:
+                self.lightDataSig(mess)
+            except Exception as e:
+                print(parsedData)
+                print(e)
+        else:
+            time_val = time.time() - self.lt_start_time
+            self.data_arr[3] ={
+                'timestamp':time_val,
+                'x':parsedData, 
+                'y':0, 
+                'z':0
+            }               
 
     def startMag(self):  
         libmetawear.mbl_mw_mag_bmm150_stop(self.device.board)
         libmetawear.mbl_mw_mag_bmm150_configure(self.device.board, 5, 5, self.MG_SampleRate)
-       
+        
+        self.mg_start_time = time.time()
+      
         self.magSignal = libmetawear.mbl_mw_mag_bmm150_get_b_field_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.magSignal, None, self.magCallback)
 
@@ -271,6 +297,7 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_gyro_bmi160_write_config(self.device.board)
 
         self.gyroSig = libmetawear.mbl_mw_gyro_bmi160_get_rotation_data_signal(self.device.board)
+        self.gy_start_time = time.time()
 
         libmetawear.mbl_mw_datasignal_subscribe(self.gyroSig, None, self.gyroCallback)
         libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(self.device.board)
@@ -289,6 +316,8 @@ class MetaMotion(iSmartDot):
         libmetawear.mbl_mw_als_ltr329_set_integration_time(self.device.board, self.LT_IntRate)
         libmetawear.mbl_mw_als_ltr329_set_measurement_rate(self.device.board, self.LT_SampleRate)
         libmetawear.mbl_mw_als_ltr329_write_config(self.device.board)
+
+        self.lt_start_time = time.time()
 
         self.lightSig = libmetawear.mbl_mw_als_ltr329_get_illuminance_data_signal(self.device.board)
         libmetawear.mbl_mw_datasignal_subscribe(self.lightSig, None, self.lightCallback)

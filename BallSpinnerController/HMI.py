@@ -40,6 +40,7 @@ class HMI:
         self.smartDot = None
         self.bsc = None
         self.graph_xl = None
+        self.data_graphs = []
 
 ################################################### Initialize UI ###################################################\
         if fullscreen:
@@ -92,10 +93,8 @@ class HMI:
         self.motor_controller_window = self.create_motor_controller_window()
         self.motor = None
         self.sd_connect_window = self.create_SD_connect_window()
-        self.XL_data_queue = Queue()
-        self.GY_data_queue = Queue()
-        self.MG_data_queue = Queue()
-        self.LT_data_queue = Queue()
+        self.sd_connect_toggle_button = self.toggle_SD_connect_window_button()
+
         #List of elements to initially hide
 
         #initialize stack for back button
@@ -118,6 +117,7 @@ class HMI:
             self.reset_button,
             self.protocol_history_window,
             self.show_protocol_button,
+            self.sd_connect_toggle_button,
         ]
 
         #self.is_protocol_visible = False
@@ -148,6 +148,7 @@ class HMI:
         #False means it is hidden, true means it is shown
         self.button_toggleable_elements = {
             self.protocol_history_window : False,
+            self.sd_connect_window : False
         }
 
         #self.shown_ui_elements = [element for element in self.all_ui_elements if element not in self.hidden_ui_elements]
@@ -168,7 +169,7 @@ class HMI:
             self.reset_button,
             self.motor_controller_window,
             self.emergency_stop_button,
-
+            self.sd_connect_toggle_button,
         ]
         self.hide_ui_elements(self.local_ui_elements_to_show)
 
@@ -260,13 +261,9 @@ class HMI:
 
         #Update SmartDot Data Queues
         if self.smartDot is not None: #and (self.smartDot is MetaMotion or self.smartDot is SmartDotEmulator):
-            #print(type(self.smartDot))
             if isinstance(self.smartDot, MetaMotion):
-                if self.graph_xl is not None:
-                    self.graph_xl.queue.put(self.smartDot.XL_data)
-               
-
-            # print("Attempting to put data in the queue")
+                for i in range(len(self.data_graphs)):
+                    self.data_graphs[i].queue.put(self.smartDot.data_arr[i])
                
             
         self.after_id = self.root.after(self.ui_update_frequency, self.check_for_updates)
@@ -330,12 +327,24 @@ class HMI:
         self.protocol_labels.append(label)
 
 ################################################### Local SD Connect ###################################################
+    def toggle_SD_connect_window_button(self):
+        btn = tk.Button(self.root, text="Local SmartDot", command = self.toggle_SD_connect_window)
+        btn.place(x=650, y=230)
+        return btn
+    def toggle_SD_connect_window(self):
+        if self.button_toggleable_elements[self.sd_connect_window] == False:
+            self.sd_connect_window = self.create_SD_connect_window()
+            self.button_toggleable_elements[self.sd_connect_window] = True
+
+        else:
+            self.fully_close_SD_connection()
+            
     def create_SD_connect_window(self):
         x = 375
-        y = 125
+        y = 50
         
         # Create a frame inside self.frame
-        frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge", width = 400, height = 300)
+        frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge", width = 400, height = 305)
         frame.place(x=x, y=y)
         frame.pack_propagate(False) #Don't shrink frame to content
 
@@ -350,47 +359,62 @@ class HMI:
         self.sd_cmd_idx = 0
         self.sd_thread = None
         self.sd_thread2 = None
-
-       # self.smartDot = None
+        close_btn = tk.Button(frame, text="Close SD Connection", command=self.fully_close_SD_connection)
+        close_btn.pack(side="bottom", pady = 2)
         return frame
+    def fully_close_SD_connection(self):
+        if len(self.data_graphs) > 0:
+            self.close_sd_graphs()
+            print("closing graphs")
+        print("closing SD window")
+        self.sd_connect_window.place_forget()
+        if isinstance(self.smartDot, MetaMotion) or isinstance(self.smartDot, SmartDotEmulator):
+            self.smartDot.disconnect()
+            print("closing SD bluetooth connection")
+            self.smartDot = None
+            print("emptying smartdot object")
+        self.button_toggleable_elements[self.sd_connect_window] = False
     def unpack_connect_elements(self):
         for i in self.connect_sd_buttons:
-            print(f"unpacking {i}")
             i.pack_forget()
         self.pack_connected_elements()
+
     def pack_connected_elements(self):
         self.sd_connected_label = tk.Label(self.sd_connect_window, text=f"Connected to {self.smartDot._MAC_ADDRESS}", font =("Arial",10))
         self.sd_connected_label.pack(in_=self.sd_connect_window)
 
         self.local_SD_config = self.create_local_SD_window()
+
     def handle_smart_dot_btn(self):
         if self.sd_thread is None:
             self.sd_thread = threading.Thread(target=self.scanAll)
             self.sd_thread.start()
         # availDevices = self.scanAll()
         self.sd_cmd_idx += 1
+
     def handle_SD_connect_btn(self, i):
         if self.sd_thread2 is None:
-            print("hi u have clik2d btn")
             self.sd_thread2 = threading.Thread(target=self.connect_to_chosen_SD, args=(i,))
             self.sd_thread2.start()
 
     def connect_to_chosen_SD(self, btn_idx):
-        #self.sd_thread.join() #Complete the scanAll Thread
-        print("Active threads:")
-        for thread in threading.enumerate():
-            print(f"  {thread.name}")
-        #Jank way to grab Correct MAC Address: Creates Keys and gra
-        print(f"Button index {btn_idx}")
-        smartDotMAC = tuple(self.availDevicesType.keys())[btn_idx]
-        smartDot = self.availDevicesType[smartDotMAC]()
-        self.smartDot = MetaMotion(tuple(self.availDevices.keys())[btn_idx], is_local=True)
-        smartDotConnect = self.smartDot.connect(smartDotMAC)
-        self.sd_cmd_idx += 1
+        try:
+            #self.sd_thread.join() #Complete the scanAll Thread
+            print("Active threads:")
+            for thread in threading.enumerate():
+                print(f"  {thread.name}")
+            #Jank way to grab Correct MAC Address: Creates Keys and gra
+            print(f"Button index {btn_idx}")
+            smartDotMAC = tuple(self.availDevicesType.keys())[btn_idx]
+            smartDot = self.availDevicesType[smartDotMAC]()
+            self.smartDot = MetaMotion(tuple(self.availDevices.keys())[btn_idx], is_local=True)
+            smartDotConnect = self.smartDot.connect(smartDotMAC)
+            self.sd_cmd_idx += 1
 
-        self.unpack_connect_elements()
+            self.unpack_connect_elements()
+        except Exception as e:
+            self.data["error_text"] = f"{e}"
 
-      
     def scanAll(self):
         self.availDevices = {}
         self.availDevicesType = {}
@@ -426,8 +450,7 @@ class HMI:
                 count = 0
                 for address, name in six.iteritems(self.availDevices):
                     if count >= i :
-                        print("[%d] %s (%s)" % (i, address, name))
-                        btn = tk.Button(self.sd_connect_window, text="[%d] %s (%s)" % (i, address, name),  font=("Arial", 8,), command=lambda i=i: self.handle_SD_connect_btn(i))
+                        btn = tk.Button(self.sd_connect_window, text=f"{address}",  font=("Arial", 10,), command=lambda i=i: self.handle_SD_connect_btn(i))
                         btn.pack(in_=self.sd_connect_window)
                         self.connect_sd_buttons.append(btn)
                         i += 1
@@ -435,14 +458,12 @@ class HMI:
                 if self.sd_cmd_idx > 1:
                     BleScanner.stop()
                     print("exiting the scan")
-                   # print("Active threads:")
-                    # for thread in threading.enumerate():
-                    #     print(f"  {thread.name}")
                     break# self.availDevices
-        except : #Called when KeyInterrut ^C is called
+        except Exception as e: #Called when KeyInterrut ^C is called
             BleScanner.stop()
-            print("Error in scanAll()")
+            self.data["error_text"] = f"Error in scanAll {e}"
             return
+
     ############### Local mode SD config window ###############
     def create_local_SD_window(self):
         sd_frame = tk.Frame(self.root, bg="lightgray", padx=5, pady=5, borderwidth=2, relief="ridge")
@@ -506,7 +527,7 @@ class HMI:
         for i in range(len(self.SD_config_values)):
             self.SD_config_values[i] = float(self.SD_config_values[i])
             self.SD_config_values[i] = math.trunc(self.SD_config_values[i])
-            print(f"type: {type(self.SD_config_values[i])}, Value: {self.SD_config_values[i]}")
+            #print(f"type: {type(self.SD_config_values[i])}, Value: {self.SD_config_values[i]}")
         print("Submitted SD Settings:", self.SD_config_values)
         self.smartDot.setSampleRates(XL=int(self.SD_config_values[0]))
         self.smartDot.setRanges(XL=int(self.SD_config_values[1]))
@@ -530,14 +551,14 @@ class HMI:
         self.local_sd_lt.pack(in_=sd_frame, pady=5)
     ############### Local mode SD GRAPHS!! ###############
     def build_SD_data_graphs(self):
-        graph_frame = tk.Frame(self.root, padx=20, pady=20)
+        graph_frame = tk.Frame(self.root, padx=7, pady=7)
         graph_frame.pack(in_=self.sd_connect_window)
 
         labels = [
-            ("XL XYZ", 0, 0),
-            ("GY XYZ 2", 0, 1),
-            ("MG XYZ 3", 1, 0),
-            ("LT XYZ 4", 1, 1),
+            ("XL", 0, 0),
+            ("GY", 0, 1),
+            ("MG", 1, 0),
+            ("LT", 1, 1),
         ]
         data_queues = [
             Queue(),
@@ -546,21 +567,42 @@ class HMI:
             Queue()
         ]
 
-        graph_update_speed = 150
+        graph_update_speed = 100
         self.smartDot.startAccel()
+        self.smartDot.startMag()
+        self.smartDot.startGyro()
+        self.smartDot.startLight()
         for i, (text, row, col) in enumerate(labels):
             # Create subframe for label + graph
             subframe = tk.Frame(graph_frame)
-            subframe.grid(row=row, column=col, padx=10, pady=10)
+            subframe.grid(row=row, column=col, padx=10, pady=0)
 
             # Add label at top of subframe
-            label = tk.Label(subframe, text=text, borderwidth=2, relief="groove", width=15)
-            label.grid(row=0, column=0, pady=(0, 5))
+            label = tk.Label(subframe, text=text, borderwidth=2, relief="groove", width=10)
+            label.grid(row=0, column=0, pady=1)
 
             # Add graph below the label
-        self.graph_xl = RealTimeGraph(subframe, data_queues[0], graph_update_speed) 
-        self.graph_xl.canvas_widget.grid(row=1, column=0)
+            graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed) 
+            graph.canvas_widget.grid(row=1, column=0)
+            self.data_graphs.append(graph)
+        # self.graph_xl = RealTimeGraph(subframe, data_queues[0], graph_update_speed) 
+        # self.graph_xl.canvas_widget.grid(row=1, column=0)
+        # self.data_graphs.append(self.graph_xl)
+        # self.sd_graph_close_btn = tk.Button(graph_frame, text="Close Graphs", command = self.close_sd_graphs)
+        # self.sd_graph_close_btn.grid(row=2, column=0, columnspan=2,)
         return graph_frame
+    def close_sd_graphs(self):
+        self.smartDot.stopAccel()
+        self.smartDot.stopMag()
+        self.smartDot.stopGyro()
+        self.smartDot.stopLight()
+        self.SD_data_graphs.pack_forget()
+
+        for i in self.data_graphs:
+            i.canvas_widget.destroy()
+            
+        self.data_graphs.clear()
+
 ################################################### Local Motor Controller ###################################################
     def create_motor_controller_window(self):
         x = 200
@@ -847,7 +889,7 @@ class HMI:
 ################################################### Initialize Local Mode ###################################################
     def launch_local_mode(self):
         # self.local_ui_elements_to_show = self.initial_ui_elements_to_hide
-        self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
+        self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button, }
         self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
         self.motor =  StepperMotor(GPIOPin=12)
 
@@ -878,10 +920,9 @@ if __name__ == "__main__":
             "lt": "",
             "mode": "",
             "message_type": "",
-            "bg_color": 'dodgerblue2',
+            "bg_color": 'red',
             "geometry": "600x300",  # Set the window size to 600x300 pixels
             "title": "Ball Spinner Controller GUI",
-            "configure": 'dodgerblue2',  # Set the background color of the window
             "error_text": "",
             "i": 0
         }

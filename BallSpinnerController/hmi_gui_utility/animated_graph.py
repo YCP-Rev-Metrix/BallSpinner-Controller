@@ -28,7 +28,7 @@ class RealTimeGraph:
         self.ax.set_xlabel("Time", fontsize=5)
         self.ax.set_ylabel("Value", fontsize=5)
         self.ax.legend(loc="upper left", fontsize=4)  # Smaller legend
-        self.ax.set_xticks([])
+        #self.ax.set_xticks([])
 
         # Create three line objects for x, y, z with circular markers
         self.line_x, = self.ax.plot([], [], label='X', color='red', marker='o', linestyle='-')
@@ -47,15 +47,16 @@ class RealTimeGraph:
         # Pull all items from the queue
         t = 0
         while not self.queue.empty():
-            #print(f"Metamotion queue address {self.queue}")
             data = self.queue.get()
-            print(f"data: {data}")
             t = data['timestamp']
             self.time_data.append(t)
             self.x_data.append(data['x'])
             self.y_data.append(data['y'])
             self.z_data.append(data['z'])
-            print(f"Data received: {data}")
+            self.m = max(abs(data['x']), abs(data['y']), abs(data['z']))
+
+            #print(f"Data received: {data}")
+
         # Keep only the last 5 seconds of data
         current_time = t
         while self.time_data and self.time_data[0] < current_time - 5:
@@ -70,6 +71,7 @@ class RealTimeGraph:
         self.line_z.set_data(self.time_data, self.z_data)
 
         self.ax.set_xlim(current_time - 5, current_time)
+        self.ax.set_ylim(-self.m - self.m/5,self.m + self.m/5)
         self.ax.relim()
         self.ax.autoscale_view(scalex=False)
 

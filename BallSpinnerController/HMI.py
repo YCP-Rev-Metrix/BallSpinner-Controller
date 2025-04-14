@@ -556,8 +556,8 @@ class HMI:
 
         labels = [
             ("XL", 0, 0),
-            ("GY", 0, 1),
-            ("MG", 1, 0),
+            ("MG", 0, 1),
+            ("GY", 1, 0),
             ("LT", 1, 1),
         ]
         data_queues = [

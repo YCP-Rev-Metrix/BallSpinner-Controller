@@ -38,20 +38,20 @@ class MotorEncoder(iAuxSensor):
         self.rpm = 0
 
     # Callback functions
-    def pulse_a(self):
+    def pulse_a(self, Blah, moreBlah, moreMoreBlah):
         b_level = self.pi.read(self.PIN_B)
         if b_level == 1:
             self.pulses += 1
         else:
             self.pulses -= 1
 
-    def index_callback(self):
+    def index_callback(self, Blah, moreBlah, moreMoreBlah):
         #RPM = (Pulses / Time Interval) * 60 / Pulses Per Revolution (PPR)
         now = time.time()
         if self.last_index_time is not None:
             dt = now - self.last_index_time
             self.rpm = (self.pulses / dt) * 60 / self.CPR
-            print(f"RPM: {self.rpm:.2f}, Position since last index: {self.pulses}")
+            #print(f"RPM: {self.rpm:.2f}, Position since last index: {self.pulses}")
         self.last_index_time = now
         self.pulses = 0  # Reset position per revolution if you want
 

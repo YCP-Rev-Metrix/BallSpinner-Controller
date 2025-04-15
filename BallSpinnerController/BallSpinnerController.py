@@ -429,11 +429,13 @@ class BallSpinnerController():
                             
                             #primMotorSpeed = int(data[3])
                             primMotorSpeed = struct.unpack('<f', data[3:7])[0]
+                            secMotor1Speed = struct.unpack('<f', data[7:11])[0]
+
                             self.PrimMotor.changeSpeed(primMotorSpeed) 
-                            print("Prim Motor Instruction: %f" % primMotorSpeed)
+                            print("Sec Motor Instruction: %f" % secMotor1Speed)
                             
               
-                            self.secMotor1.changeSpeed(int(data[4])) 
+                            self.secMotor1.changeSpeed(secMotor1Speed) 
                             self.secMotor2.changeSpeed(int(data[5]))
 
 

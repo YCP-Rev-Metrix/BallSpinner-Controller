@@ -1,6 +1,7 @@
 import pigpio
 import time
 from .iAuxSensor import iAuxSensor
+import threading
 
 class MotorEncoder(iAuxSensor):
     # GPIO pins
@@ -32,30 +33,33 @@ class MotorEncoder(iAuxSensor):
 
         # Set callbacks
         cb_a = self.pi.callback(PIN_A, pigpio.RISING_EDGE, self.pulse_a)
-        cb_i = self.pi.callback(PIN_I, pigpio.RISING_EDGE, self.index_callback)
+       # cb_i = self.pi.callback(PIN_I, pigpio.RISING_EDGE, self.index_callback)
 
         self.CPR = 500
         self.rpm = 0
+        self.t = threading.Timer(1.0,self.index_callback)
+        self.t.start()
 
     # Callback functions
     def pulse_a(self, Blah, moreBlah, moreMoreBlah):
         b_level = self.pi.read(self.PIN_B)
+        print("Tick")
         if b_level == 1:
             self.pulses += 1
         else:
             self.pulses -= 1
 
-    def index_callback(self, Blah, moreBlah, moreMoreBlah):
+    def index_callback(self, Blah = None, moreBlah = None, moreMoreBlah = None):
         #RPM = (Pulses / Time Interval) * 60 / Pulses Per Revolution (PPR)
         now = time.time()
-        if self.last_index_time is not None:
-            dt = now - self.last_index_time
-            self.rpm = (self.pulses / dt) * 60 / self.CPR
-            #print(f"RPM: {self.rpm:.2f}, Position since last index: {self.pulses}")
+        self.rpm = (self.pulses ) * 60 / self.CPR
+        print(f"RPM: {self.rpm:.2f}, Position since last index: {self.pulses}")
         self.last_index_time = now
         self.pulses = 0  # Reset position per revolution if you want
+        del self.t
+        self.t = threading.Timer(1.0,self.index_callback)
+        self.t.start()
 
-    
     def stopSenosr(self):
 
        #cb_a.cancel()
@@ -63,4 +67,5 @@ class MotorEncoder(iAuxSensor):
         self.pi.stop()
 
     def readData(self):
+        self.index_callback()
         return self.rpm

@@ -5,6 +5,7 @@ from BallSpinnerController.Motors.StepperMotor import StepperMotor
 from BallSpinnerController.SmartDots.iSmartDot import iSmartDot
 from BallSpinnerController.SmartDots.MetaMotion import MetaMotion
 from BallSpinnerController.SmartDots.SmartDotEmulator import SmartDotEmulator
+from .AuxSensors.MotorEncoder import MotorEncoder
 from mbientlab.warble import BleScanner
 import tkinter as tk
 from tkinter import ttk
@@ -41,6 +42,8 @@ class HMI:
         self.bsc = None
         self.graph_xl = None
         self.data_graphs = []
+        self.motorEncodersOn = False
+        self.motorEncoder1 = None
 
 ################################################### Initialize UI ###################################################\
         if fullscreen:
@@ -263,9 +266,22 @@ class HMI:
         if self.smartDot is not None: #and (self.smartDot is MetaMotion or self.smartDot is SmartDotEmulator):
             if isinstance(self.smartDot, MetaMotion):
                 for i in range(len(self.data_graphs)):
+                    print(f"Gyro data {self.smartDot.data_arr[2]}")
                     self.data_graphs[i].queue.put(self.smartDot.data_arr[i])
                
             
+        if self.popup_speed.cget("text") != "" and self.active_motor is not None:
+            rpm = float(self.popup_speed.cget("text").split(" ")[1])# != self.data['motor_encoder_rpms'][0]:
+            # print(f"{type(rpm)} rpm : {rpm}")
+            if rpm != self.data["motor_encoder_rpms"][0]:
+                print("overwrote the rpm")
+                self.popup_speed.config(text = f"Speed: {self.data['motor_encoder_rpms'][0]} RPM")
+            print(type(self.motorEncoder1))
+            if self.motorEncodersOn and self.motorEncoder1 is not None:
+                me1cData = self.motorEncoder1.readData()
+                print("Motor 1 RPM %.2f" % me1cData)
+                #Send data to HMI
+                self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData
         self.after_id = self.root.after(self.ui_update_frequency, self.check_for_updates)
 
 ################################################### Basic Data Labels ###################################################
@@ -620,7 +636,7 @@ class HMI:
 
         
         # Create a label inside mc_frame
-        self.selected_motor = tk.Label(mc_frame, bg="lightgray", text=f"Select a motor button", font=("Arial", 12,))
+        self.selected_motor = tk.Label(mc_frame, bg="lightgray", text=f"Hit Motor 1 Btn", font=("Arial", 12,))
         self.selected_motor.grid(row=0, column=0, columnspan=3, pady=5)
 
         # Create buttons inside mc_frame using grid (instead of pack)
@@ -641,16 +657,25 @@ class HMI:
     def change_motor_speed(self, btn_idx):
         if self.motor.state == False:
             self.motor.turnOnMotor()
+            #Make motor encoder object when we activate our motor
+            try:
+                self.motorEncoder1 = MotorEncoder()
+                self.motorEncodersOn = True
+            except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                    print(f"Error When attempting to set up Motor Encoder: {e}")      
+
         increment = self.motor_button_text_list[btn_idx]
         if btn_idx > 2:
             increment = int(increment.split("+")[1])
         else:
             increment = int(increment)
-        print(f"Button idx {btn_idx}")
-        print(f"Changing motor speed by: {increment}")
-        self.motor.changeSpeed(self.motor.rpm + increment)
-        print(f"Motor speed should now be: {self.motor.rpm}")\
+        if self.motor.rpm + increment > 0:
+            self.motor.changeSpeed(self.motor.rpm + increment)
+            print(f"Changing motor speed by: {increment}")
+            print(f"Motor speed should now be: {self.motor.rpm}")
 
+        else:
+            print("cant set motor rpm below 0")
         self.update_motor_controller_text()
 
 ################################################### Motor Data popup ###################################################
@@ -662,7 +687,6 @@ class HMI:
         self.popup_title = tk.Label(popup_frame, text="Motor Details", font=("Arial", 14, "bold"), bg="lightgray")
         self.popup_current = tk.Label(popup_frame, text="", bg="lightgray")
         self.popup_speed = tk.Label(popup_frame, text="", bg="lightgray")
-        self.popup_temp = tk.Label(popup_frame, text="", bg="lightgray")
         self.popup_status = tk.Label(popup_frame, text="", bg="lightgray")
 
         # Close button (alternative way to close)
@@ -671,7 +695,6 @@ class HMI:
         # Pack elements inside the popup frame
         self.popup_title.pack(in_=popup_frame,pady=5)
         self.popup_speed.pack(in_=popup_frame,)
-        self.popup_temp.pack(in_=popup_frame,)
         self.popup_current.pack(in_=popup_frame,)
         self.popup_status.pack(in_=popup_frame,)
         self.close_button.pack(in_=popup_frame, pady=5)
@@ -689,7 +712,6 @@ class HMI:
         self.popup_current.config(text=f"Current: {self.data['motor_currents'][motor_id-1]}A")
         self.popup_title.config(text=f"Motor {motor_id} Details")
         self.popup_speed.config(text=f"Speed: {100 + motor_id * 10} RPM")
-        self.popup_temp.config(text=f"Temperature: {40 + motor_id}°C")
         self.popup_status.config(text=f"Status: Running")
 
         # Place the popup in the UI
@@ -845,9 +867,8 @@ class HMI:
     #TODO: function for back button from main local or bsc screen    
     # Hide necessary UI elements. 
     # If back to Mode selection screen:     Close server connection if open     
-    def reset_to_init_state(self):
+    def stop_bsc(self):
         self.data["close_bsc"] = True
-        self.full_reset_ui()
         
     def show_protocol_history(self):
         show = [None]
@@ -892,6 +913,8 @@ class HMI:
         self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button, }
         self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
         self.motor =  StepperMotor(GPIOPin=12)
+        self.stop_bsc()
+
 
 
 

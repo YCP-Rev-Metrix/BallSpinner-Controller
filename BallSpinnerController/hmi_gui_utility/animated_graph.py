@@ -4,10 +4,11 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import random
 import time
+import math
 from queue import Queue
 
 class RealTimeGraph:
-    def __init__(self, master, data_q, update_speed=100, xl_config=None):
+    def __init__(self, master, data_q, update_speed=100, xl_config=None, ymin=-2, ymax=2):
         self.master = master
         self.queue = data_q
         #master.title("Real-time XYZ Graph")
@@ -19,7 +20,7 @@ class RealTimeGraph:
         if xl_config != None:
             pass 
             #set the y lim to be that of the XL Range Parameter
-        self.ax.set_ylim(-2,2)
+        self.ax.set_ylim(ymin,ymax)
         self.x_data = []
         self.y_data = []
         self.z_data = []
@@ -50,10 +51,11 @@ class RealTimeGraph:
             data = self.queue.get()
             t = data['timestamp']
             self.time_data.append(t)
-            self.x_data.append(data['x'])
-            self.y_data.append(data['y'])
-            self.z_data.append(data['z'])
-            self.m = max(abs(data['x']), abs(data['y']), abs(data['z']))
+            if not math.isinf(data['x']):
+                self.x_data.append(data['x'])
+                self.y_data.append(data['y'])
+                self.z_data.append(data['z'])
+               # self.m = max(abs(data['x']), abs(data['y']), abs(data['z']))
 
             #print(f"Data received: {data}")
 
@@ -71,7 +73,7 @@ class RealTimeGraph:
         self.line_z.set_data(self.time_data, self.z_data)
 
         self.ax.set_xlim(current_time - 5, current_time)
-        self.ax.set_ylim(-self.m - self.m/5,self.m + self.m/5)
+        #self.ax.set_ylim(-self.m - self.m/5,self.m + self.m/5)
         self.ax.relim()
         self.ax.autoscale_view(scalex=False)
 

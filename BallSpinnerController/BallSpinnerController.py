@@ -194,7 +194,7 @@ class BallSpinnerController():
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
-                    print("Sending Mag")
+                    #print("Sending Mag")
                 except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopMag()
             
@@ -202,6 +202,7 @@ class BallSpinnerController():
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
                                         0x00, 0x13, SensorType.SD_GY]) # Send B_A_SD_SENSOR_DATA for XL
                 bytesData.extend(dataBytes)
+                print(f"Gyro Data: {dataBytes}")
                 try:
                     self.commsChannel.sendall(bytesData)
              
@@ -407,17 +408,19 @@ class BallSpinnerController():
 
                                 # First Motor Instruction:         
                                 #Turn On Motors
-                                print("Turning on motors")
-                                #I asked for a number between 1 and 20
-                                self.PrimMotor = StepperMotor(12) 
-                                print("PrimMotor Turned On")
-                                self.secMotor1 = StepperMotor(23)
-                                self.secMotor2 = StepperMotor(24)                
+                                try:
+                                    print("Turning on motors")
+                                    #I asked for a number between 1 and 20
+                                    self.PrimMotor = StepperMotor(12) 
+                                    print("PrimMotor Turned On")
+                                    self.secMotor1 = StepperMotor(23)
+                                    self.secMotor2 = StepperMotor(24)                
 
-                                self.PrimMotor.turnOnMotor()
-                                self.secMotor1.turnOnMotor()
-                                self.secMotor2.turnOnMotor()
-
+                                    self.PrimMotor.turnOnMotor()
+                                    self.secMotor1.turnOnMotor()
+                                    self.secMotor2.turnOnMotor()
+                                except:
+                                    print("No motor pins connected")
                                 
                                 self.mode = BSCModes.TAKING_SHOT_DATA
 
@@ -440,21 +443,23 @@ class BallSpinnerController():
                                 print("Received Stop Function")
                                 #Stop Motors
 
-                                self.PrimMotor.turnOffMotor()
-                                self.secMotor1.turnOffMotor()
-                                self.secMotor2.turnOffMotor()
-                                
-                                del self.PrimMotor
-                                del self.secMotor1
-                                del self.secMotor2
-                                
+                                try:
+                                    self.PrimMotor.turnOffMotor()
+                                    self.secMotor1.turnOffMotor()
+                                    self.secMotor2.turnOffMotor()
+                                    
+                                    del self.PrimMotor
+                                    del self.secMotor1
+                                    del self.secMotor2
+                                    
 
-                                print("Stopping Auxillary Sensors")
-                                
-                                del self.motorCurrentSensor1
-                                del self.motorCurrentSensor2
-                                del self.motorCurrentSensor3
-
+                                    print("Stopping Auxillary Sensors")
+                                    
+                                    del self.motorCurrentSensor1
+                                    del self.motorCurrentSensor2
+                                    del self.motorCurrentSensor3
+                                except:
+                                    print("are the motors connected?")
                                 #Stop SmartDot Data Collection
                                 self.smartDot.stopAccel()
                                 self.smartDot.stopGyro()
@@ -539,7 +544,10 @@ class BallSpinnerController():
                     
                 if self.motorEncodersOn:
                     me1cData = self.motorEncoder1.readData()
-                    print("Motor 1 RPM %.2f" % self.motorEncoder1.readData())
+                    print("Motor 1 RPM %.2f" % me1cData)
+                    #Send data to HMI
+                    self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData
+                    #Send data to BSA
                     bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
                                             0x00, 0x0C, SensorType.M1_ENC]) # Send B_A_SD_SENSOR_DATA for MG
                     bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])

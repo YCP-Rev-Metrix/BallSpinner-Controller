@@ -37,6 +37,7 @@ if __name__ == "__main__":
     shared_data = {
             "protocol_queue": queue.Queue(),
             "motor_currents": [0,0,0],
+            "motor_encoder_rpms": [0.0,0.0,0.0],
             "can_launch_BSC": True,
             "close_bsc":False,
             "ip": "",

@@ -95,9 +95,9 @@ def simulate_data_feed(data_q):
 
             data_q.put({
                 'timestamp': time.time(),
-                'x': math.sin(t),
-                'y': math.cos(t),
-                'z': math.sin(t) * math.cos(t),  # combined wave for fun
+                'x': math.sin(t) + random.random(),
+                'y': math.cos(t) + random.random(),
+                'z': math.sin(t) * math.cos(t) + random.random(),  # combined wave for fun
             })
 
     threading.Thread(target=feed, daemon=True).start()

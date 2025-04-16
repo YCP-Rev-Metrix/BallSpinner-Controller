@@ -586,7 +586,7 @@ class HMI:
             Queue()
         ]
 
-        graph_update_speed = 100
+        graph_update_speed = 45
         self.smartDot.startAccel()
         self.smartDot.startMag()
         self.smartDot.startGyro()

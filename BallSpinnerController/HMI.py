@@ -53,6 +53,8 @@ class HMI:
             # Set window size to full screen
             # Keep window on top (optional)
             self.root.attributes("-topmost", True)
+            self.root.tk.call('tk', 'scaling', .85)  # 1.0 is 100% scaling
+
 
         # self.root.geometry("800x480")
         self.screen_width = 800
@@ -266,22 +268,23 @@ class HMI:
         if self.smartDot is not None: #and (self.smartDot is MetaMotion or self.smartDot is SmartDotEmulator):
             if isinstance(self.smartDot, MetaMotion):
                 for i in range(len(self.data_graphs)):
-                    print(f"Gyro data {self.smartDot.data_arr[2]}")
+                    #print(f"Gyro data {self.smartDot.data_arr[2]}")
                     self.data_graphs[i].queue.put(self.smartDot.data_arr[i])
                
             
         if self.popup_speed.cget("text") != "" and self.active_motor is not None:
-            rpm = float(self.popup_speed.cget("text").split(" ")[1])# != self.data['motor_encoder_rpms'][0]:
-            # print(f"{type(rpm)} rpm : {rpm}")
-            if rpm != self.data["motor_encoder_rpms"][0]:
-                print("overwrote the rpm")
-                self.popup_speed.config(text = f"Speed: {self.data['motor_encoder_rpms'][0]} RPM")
             print(type(self.motorEncoder1))
             if self.motorEncodersOn and self.motorEncoder1 is not None:
                 me1cData = self.motorEncoder1.readData()
                 print("Motor 1 RPM %.2f" % me1cData)
                 #Send data to HMI
                 self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData
+            rpm = float(self.popup_speed.cget("text").split(" ")[1])# != self.data['motor_encoder_rpms'][0]:
+            # print(f"{type(rpm)} rpm : {rpm}")
+            if rpm != self.data["motor_encoder_rpms"][0]:
+                print("overwrote the rpm")
+                self.popup_speed.config(text = f"Speed: {self.data['motor_encoder_rpms'][0]} RPM")
+                
         self.after_id = self.root.after(self.ui_update_frequency, self.check_for_updates)
 
 ################################################### Basic Data Labels ###################################################

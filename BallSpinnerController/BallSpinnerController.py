@@ -545,7 +545,7 @@ class BallSpinnerController():
 #                    self.commsChannel.sendall(bytesData)
                     
                 if self.motorEncodersOn and self.mode == BSCModes.TAKING_SHOT_DATA:
-                    me1cData = self.PrimMotor.rpm #self.motorEncoder1.readData()
+                    me1cData =self.motorEncoder1.readData() #self.motorEncoder1.readData()
                     print("Motor 1 RPM %.2f" % me1cData)
                     #Send data to HMI
                     self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData

@@ -65,5 +65,4 @@ class MotorEncoder(iAuxSensor):
         self.pi.stop()
 
     def readData(self):
-        self.index_callback()
         return self.rpm

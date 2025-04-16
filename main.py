@@ -46,7 +46,7 @@ if __name__ == "__main__":
             "sample_rates":["--:--","--:--","--:--","--:--"],
             "mode": "",
             "message_type": "",
-            "bg_color": 'black',
+            "bg_color": '#4f009d',
             "geometry": "600x300",  # Set the window size to 600x300 pixels
             "title": "Ball Spinner Controller GUI",
             "error_text": "",

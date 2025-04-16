@@ -8,10 +8,11 @@ import math
 from queue import Queue
 
 class RealTimeGraph:
-    def __init__(self, master, data_q, update_speed=100, xl_config=None, ymin=-2, ymax=2):
+    def __init__(self, master, data_q, update_speed=100, xl_config=None, ymin=-2, ymax=2, changey=True):
         self.master = master
         self.queue = data_q
         self.m = 0
+        self.changey = changey
         #master.title("Real-time XYZ Graph")
 
         dpi = 50  # Adjust as needed
@@ -74,7 +75,8 @@ class RealTimeGraph:
         self.line_z.set_data(self.time_data, self.z_data)
 
         self.ax.set_xlim(current_time - 5, current_time)
-        self.ax.set_ylim(-self.m - self.m/5, self.m + self.m/5)
+        if self.changey:
+            self.ax.set_ylim(-self.m - self.m/5, self.m + self.m/5)
         self.ax.relim()
         self.ax.autoscale_view(scalex=False)
 
@@ -86,15 +88,17 @@ def simulate_data_feed(data_q):
     import threading
 
     def feed():
+        start_time = time.time()
         while True:
-            time.sleep(1)  # simulate 20Hz sensor
+            t = time.time() - start_time  # elapsed time
+            time.sleep(.2)  # simulate 20Hz sensor (50 ms interval)
+
             data_q.put({
                 'timestamp': time.time(),
-                'x': random.uniform(-1, 1),
-                'y': random.uniform(-1, 1),
-                'z': random.uniform(-1, 1),
+                'x': math.sin(t),
+                'y': math.cos(t),
+                'z': math.sin(t) * math.cos(t),  # combined wave for fun
             })
-            #print (f"Data added to queue: {data_q.queue[-1]}")
 
     threading.Thread(target=feed, daemon=True).start()
 

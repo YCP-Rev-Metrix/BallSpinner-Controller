@@ -276,7 +276,7 @@ class HMI:
             print(type(self.motorEncoder1))
             if self.motorEncodersOn and self.motorEncoder1 is not None:
                 me1cData = self.motorEncoder1.readData()
-                print("Motor 1 RPM %.2f" % me1cData)
+                #print("Motor 1 RPM %.2f" % me1cData)
                 #Send data to HMI
                 self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData
             rpm = float(self.popup_speed.cget("text").split(" ")[1])# != self.data['motor_encoder_rpms'][0]:
@@ -591,6 +591,7 @@ class HMI:
         self.smartDot.startMag()
         self.smartDot.startGyro()
         self.smartDot.startLight()
+        simulate_data_feed(data_queues[2])
         for i, (text, row, col) in enumerate(labels):
             # Create subframe for label + graph
             subframe = tk.Frame(graph_frame)
@@ -601,7 +602,10 @@ class HMI:
             label.grid(row=0, column=0, pady=1)
 
             # Add graph below the label
-            graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed) 
+            bIsForBool = True
+            if i == 2 or i == 0:
+                bIsForBool=False
+            graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed,changey=bIsForBool) 
             graph.canvas_widget.grid(row=1, column=0)
             self.data_graphs.append(graph)
         # self.graph_xl = RealTimeGraph(subframe, data_queues[0], graph_update_speed) 
@@ -809,7 +813,7 @@ class HMI:
 
         # Create buttons that toggle the popup
         for i in range(3):
-            button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="lightblue", width=10, height=2,
+            button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="gray60", width=10, height=2,
                                command=lambda m=i+1: self.toggle_popup(m))
             button.grid(in_=grid_frame, row=0, column=i, padx=10, pady=10)
         return grid_frame

@@ -53,7 +53,7 @@ class HMI:
             # Set window size to full screen
             # Keep window on top (optional)
             self.root.attributes("-topmost", True)
-            self.root.tk.call('tk', 'scaling', .85)  # 1.0 is 100% scaling
+            self.root.tk.call('tk', 'scaling', .91)  # 1.0 is 100% scaling
 
 
         # self.root.geometry("800x480")

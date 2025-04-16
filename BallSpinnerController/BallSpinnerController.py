@@ -202,7 +202,7 @@ class BallSpinnerController():
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
                                         0x00, 0x13, SensorType.SD_GY]) # Send B_A_SD_SENSOR_DATA for XL
                 bytesData.extend(dataBytes)
-                print(f"Gyro Data: {dataBytes}")
+                #print(f"Gyro Data: {dataBytes}")
                 try:
                     self.commsChannel.sendall(bytesData)
              
@@ -544,8 +544,8 @@ class BallSpinnerController():
                     bytesData.extend(struct.pack('<f', m3cData))
 #                    self.commsChannel.sendall(bytesData)
                     
-                if self.motorEncodersOn:
-                    me1cData = self.motorEncoder1.readData()
+                if self.motorEncodersOn and self.mode == BSCModes.TAKING_SHOT_DATA:
+                    me1cData = self.PrimMotor.rpm #self.motorEncoder1.readData()
                     print("Motor 1 RPM %.2f" % me1cData)
                     #Send data to HMI
                     self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData

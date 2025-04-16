@@ -5,11 +5,11 @@ import threading
 
 class MotorEncoder(iAuxSensor):
     # GPIO pins
-    PIN_A = 15
+    PIN_A = 18
     PIN_B = 27
     PIN_I = 14
 
-    def __init__(self, PIN_A = 15, PIN_B = 27, PIN_I = 14):
+    def __init__(self, PIN_A = 18, PIN_B = 27, PIN_I = 14):
         self.pi = pigpio.pi()
         self.PIN_B = PIN_B
         self.PIN_A = PIN_A
@@ -43,17 +43,15 @@ class MotorEncoder(iAuxSensor):
     # Callback functions
     def pulse_a(self, Blah, moreBlah, moreMoreBlah):
         b_level = self.pi.read(self.PIN_B)
-        print("Tick")
-        if b_level == 1:
-            self.pulses += 1
-        else:
-            self.pulses -= 1
+        #print("Tick")
+        self.pulses += 1
+    
 
     def index_callback(self, Blah = None, moreBlah = None, moreMoreBlah = None):
         #RPM = (Pulses / Time Interval) * 60 / Pulses Per Revolution (PPR)
         now = time.time()
         self.rpm = (self.pulses ) * 60 / self.CPR
-        print(f"RPM: {self.rpm:.2f}, Position since last index: {self.pulses}")
+        #print(f"RPM: {self.rpm:.2f}, Position since last index: {self.pulses}")
         self.last_index_time = now
         self.pulses = 0  # Reset position per revolution if you want
         del self.t

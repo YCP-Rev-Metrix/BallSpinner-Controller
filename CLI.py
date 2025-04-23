@@ -1,9 +1,9 @@
-from BallSpinnerController.iSmartDot import iSmartDot
-from BallSpinnerController.MetaMotion import MetaMotion
-from BallSpinnerController.SmartDotEmulator import SmartDotEmulator
+from BallSpinnerController.SmartDots.iSmartDot import iSmartDot
+from BallSpinnerController.SmartDots.MetaMotion import MetaMotion
+from BallSpinnerController.SmartDots.SmartDotEmulator import SmartDotEmulator
 #from BallSpinnerController.Motor import Motor
-from BallSpinnerController.iMotor import iMotor
-from BallSpinnerController.StepperMotor import StepperMotor as Motor
+from BallSpinnerController.Motors.iMotor import iMotor
+from BallSpinnerController.Motors.StepperMotor import StepperMotor as Motor
 from mbientlab.warble import BleScanner
 import six
 import time
@@ -154,6 +154,8 @@ class CLI:
 
             else:
                 print("Invalid Input, Please Try Again\n")
+            
+        smartDot.disconnect()
 
     def motorCLI(self):
         print("----------------------")

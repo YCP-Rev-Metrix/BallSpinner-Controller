@@ -2,24 +2,15 @@ from .iMotor import iMotor
 import RPi.GPIO as GPIO
 
 class StepperMotor(iMotor):
-# Pin configuration (using BCM numbering)
-#DIR_PIN = 20     # Direction pin (CW/CCW)
-#STEP_PIN = 35    # Using a valid pin (adjust if necessary)
-#ENABLE_PIN = 16  # Enable pin
 
-
-#Set PWM Pin Motor is Connected to 
-#GPIOPin = STEP_PIN #12
-#PWM = 400
-#Configure GPIO Pin
-
+    DIP_Frequecy = 3200
 
 
 
     def __init__(self, GPIOPin : int):
         #Set PWM Pin Motor is Connected to 
         self.GPIOPin = GPIOPin #12
-        self.PWM = 400
+        self.freqMultiplier = 3200 #Change to DIP frequency
 
         #Configure GPIO Pin
         GPIO.setwarnings(False)
@@ -28,7 +19,7 @@ class StepperMotor(iMotor):
         
         GPIO.setup(GPIOPin, GPIO.OUT)
         #1kHz
-        self.PWM : GPIO.PWM = GPIO.PWM(GPIOPin, 400)
+        self.PWM : GPIO.PWM = GPIO.PWM(GPIOPin, self.freqMultiplier)
         #Declare on/off State (0 = Off; 1 = On)
         self.state = False
         self.rpm = 0
@@ -36,7 +27,7 @@ class StepperMotor(iMotor):
     def turnOnMotor(self, rpm = 1):
         if not self.state:
             if int(rpm) != 0:
-                self.PWM.ChangeFrequency(rpm * 400)
+                self.PWM.ChangeFrequency(rpm * self.freqMultiplier)
                 self.PWM.start(50)
                 self.rpm = rpm
 
@@ -58,7 +49,7 @@ class StepperMotor(iMotor):
         if rpm > 0:
             if self.rpm == 0.0 :
                 self.turnOnMotor(self.rpm)
-            self.PWM.ChangeFrequency(rpm * 400 / 60)
+            self.PWM.ChangeFrequency(rpm * self.freqMultiplier / 60)
             self.rpm = rpm
 
 

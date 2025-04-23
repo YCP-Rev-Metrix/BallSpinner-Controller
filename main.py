@@ -13,7 +13,7 @@ def BSC_thread():
 
 #In order to know whether or not the HMI can successfully run, we create an HMI thread class that stores an exception.
 class HMIThread(threading.Thread):
-    def __init__(self, shared_data):
+    def __init__(self, shared_data, fullscreen=True):
         super().__init__()
         self.shared_data = shared_data
         self.exception = False  # This will track if an exception occurs
@@ -23,7 +23,7 @@ class HMIThread(threading.Thread):
     def run(self):
         try:
             # UI initialization and method calls
-            ui = HMI(self.shared_data)
+            ui = HMI(self.shared_data, fullscreen)
             ui.check_for_updates()
             ui.run()
         except Exception as e:
@@ -37,6 +37,7 @@ if __name__ == "__main__":
     shared_data = {
             "protocol_queue": queue.Queue(),
             "motor_currents": [0,0,0],
+            "motor_encoder_rpms": [0.0,0.0,0.0],
             "can_launch_BSC": True,
             "close_bsc":False,
             "ip": "",
@@ -45,17 +46,20 @@ if __name__ == "__main__":
             "sample_rates":["--:--","--:--","--:--","--:--"],
             "mode": "",
             "message_type": "",
-            "bg_color": 'dodgerblue2',
+            "bg_color": '#32023d',
             "geometry": "600x300",  # Set the window size to 600x300 pixels
             "title": "Ball Spinner Controller GUI",
-            "configure": 'dodgerblue2',  # Set the background color of the window
             "error_text": "",
             "i": 0,
             "estop": False,
     }
         
     # Create threads for the UI and the other loop
-    hmi_thread = HMIThread(shared_data)
+    fullscreen = True
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "1":
+            fullscreen = False
+    hmi_thread = HMIThread(shared_data, fullscreen)
 
     # Start the HMI thread first
     print("Starting the HMI thread")

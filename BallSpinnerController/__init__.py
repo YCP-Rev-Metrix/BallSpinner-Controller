@@ -1,8 +1,8 @@
 from .BallSpinnerController import scanAll
 from .BallSpinnerController import BallSpinnerController
-from .SmartDotEmulator import SmartDotEmulator
-from .iSmartDot import iSmartDot
-from .MetaMotion import MetaMotion
-from .Motor import Motor
+from .SmartDots.SmartDotEmulator import SmartDotEmulator
+from .SmartDots.iSmartDot import iSmartDot
+from .SmartDots.MetaMotion import MetaMotion
+from .Motors.Motor import Motor
 
 __all__ = ["scanAll","BallSpinnerController", "iSmartDot", "MetaMotion","SmartDotEmulator", "Motor"]

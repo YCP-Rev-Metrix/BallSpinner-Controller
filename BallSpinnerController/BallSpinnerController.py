@@ -5,12 +5,13 @@ import threading
 import subprocess
 from mbientlab.warble import BleScanner
 import six
-from .MetaMotion import MetaMotion
-from .SmartDotEmulator import SmartDotEmulator
-from .iSmartDot import iSmartDot
-from .Motor import Motor
-from .StepperMotor import StepperMotor
+from .SmartDots.MetaMotion import MetaMotion
+from .SmartDots.SmartDotEmulator import SmartDotEmulator
+from .SmartDots.iSmartDot import iSmartDot
+from .Motors.Motor import Motor
+from .Motors.StepperMotor import StepperMotor
 from .AuxSensors import iAuxSensor
+from .AuxSensors.MotorEncoder import MotorEncoder
 from .AuxSensors.CurrentSensors import CurrentSensor
 import socket
 import struct
@@ -102,11 +103,12 @@ class BallSpinnerController():
                     self.secMotor2.turnOffMotor()   
                 data["estop"] = False
             await asyncio.sleep(1)
-    
+  
     async def socketHandler(self, ipAddr):    
         while(True): #loop re-opening socket if crashes
 
-        
+            self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
+
             #turn on Sensors
             try:
                 self.motorCurrentSensor1 = CurrentSensor(ADC_IN=0)
@@ -116,8 +118,13 @@ class BallSpinnerController():
                 print("Sensors Turned on")
             except ValueError:
                 self.data['error_text'] = "I2C Not Detected, please Check Wifi"
-                currentSenorsOn = False
+                self.currentSenorsOn = False
 
+            try:
+                self.motorEncoder1 = MotorEncoder()
+                self.motorEncodersOn = True
+            except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                    print(f"Error When attempting to set up Motor Encoder: {e}")                
             self.mode = BSCModes.WAITING_FOR_APP_INITILIZATION
             #initiate Port to 8411
             self.commsPort = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -169,7 +176,7 @@ class BallSpinnerController():
             print("Handling SmartDot:")
             def accelDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x41]) # Send Sensor Data for XL  
+                                        0x00, 0x13, SensorType.SD_XL]) # Send Sensor Data for XL  
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
@@ -183,45 +190,34 @@ class BallSpinnerController():
 
             def magDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x4D]) # Send B_A_SD_SENSOR_DATA for MG
+                                        0x00, 0x13, SensorType.SD_MG]) # Send B_A_SD_SENSOR_DATA for MG
                 bytesData.extend(dataBytes)
                 try:
                     self.commsChannel.sendall(bytesData)
-                    print("Sending Mag")
-                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
-                    #p_msg = MsgType.name_from_value(bytesData[0])
-                    #self.data["message_type"] = p_msg
-                    #self.data["protocol_queue"].put(p_msg)
-             
+                    #print("Sending Mag")
                 except Exception:  # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopMag()
             
             def gyroDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x47]) # Send B_A_SD_SENSOR_DATA for XL
+                                        0x00, 0x13, SensorType.SD_GY]) # Send B_A_SD_SENSOR_DATA for XL
                 bytesData.extend(dataBytes)
+                #print(f"Gyro Data: {dataBytes}")
                 try:
                     self.commsChannel.sendall(bytesData)
-                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
-                    #p_msg = MsgType.name_from_value(bytesData[0])
-                    #self.data["message_type"] = p_msg
-                    #self.data["protocol_queue"].put(p_msg)
              
                 except Exception: # Assumed Exception is caused from broken pipe, can look into another time
                     self.smartDot.stopGyro()
 
             def lightDataSignal(dataBytes : bytearray):
                 bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                                        0x00, 0x13, 0x4C])
+                                        0x00, 0x13, SensorType.SD_LT])
                 bytesData.extend(dataBytes)
                 #Add 0's to "Y and Z values"
                 bytesData.extend(b'\x00\x00\x00\x00\x00\x00\x00\x00')
                 try:
                     self.commsChannel.sendall(bytesData)
-                    #TODO:  This will likely flood. Create some sort of timer or limit on printing this to protocol history
-                    #p_msg = MsgType.name_from_value(bytesData[0])
-                    #self.data["message_type"] = p_msg
-                    #self.data["protocol_queue"].put(p_msg)
+                    
                 except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
                     print(f"Error Occured Somewhere in BSC: {e}")
                     self.smartDot.stopLight()
@@ -230,8 +226,7 @@ class BallSpinnerController():
            
 
             self.smartDot.setDataSignals(accelDataSig=accelDataSignal, magDataSig=magDataSignal, gyroDataSig=gyroDataSignal, lightDataSig=lightDataSignal)
-            #Instantly Setting the Start Configs for the 9DOF's to skip implementation
-
+            
             self.smartDot.startMag()
             self.smartDot.startAccel()
             self.smartDot.startGyro() 
@@ -413,17 +408,19 @@ class BallSpinnerController():
 
                                 # First Motor Instruction:         
                                 #Turn On Motors
-                                print("Turning on motors")
-                                #I asked for a number between 1 and 20
-                                self.PrimMotor = StepperMotor(12) 
-                                print("PrimMotor Turned On")
-                                self.secMotor1 = StepperMotor(23)
-                                self.secMotor2 = StepperMotor(24)                
+                                try:
+                                    print("Turning on motors")
+                                    #I asked for a number between 1 and 20
+                                    self.PrimMotor = StepperMotor(12) 
+                                    print("PrimMotor Turned On")
+                                    self.secMotor1 = StepperMotor(23)
+                                    self.secMotor2 = StepperMotor(24)                
 
-                                self.PrimMotor.turnOnMotor()
-                                self.secMotor1.turnOnMotor()
-                                self.secMotor2.turnOnMotor()
-
+                                    self.PrimMotor.turnOnMotor()
+                                    self.secMotor1.turnOnMotor()
+                                    self.secMotor2.turnOnMotor()
+                                except:
+                                    print("No motor pins connected")
                                 
                                 self.mode = BSCModes.TAKING_SHOT_DATA
 
@@ -432,11 +429,13 @@ class BallSpinnerController():
                             
                             #primMotorSpeed = int(data[3])
                             primMotorSpeed = struct.unpack('<f', data[3:7])[0]
+                            secMotor1Speed = struct.unpack('<f', data[7:11])[0]
+
                             self.PrimMotor.changeSpeed(primMotorSpeed) 
-                            print("Prim Motor Instruction: %f" % primMotorSpeed)
+                            print("Sec Motor Instruction: %f" % secMotor1Speed)
                             
               
-                            self.secMotor1.changeSpeed(int(data[4])) 
+                            self.secMotor1.changeSpeed(secMotor1Speed) 
                             self.secMotor2.changeSpeed(int(data[5]))
 
 
@@ -446,21 +445,23 @@ class BallSpinnerController():
                                 print("Received Stop Function")
                                 #Stop Motors
 
-                                self.PrimMotor.turnOffMotor()
-                                self.secMotor1.turnOffMotor()
-                                self.secMotor2.turnOffMotor()
-                                
-                                del self.PrimMotor
-                                del self.secMotor1
-                                del self.secMotor2
-                                
+                                try:
+                                    self.PrimMotor.turnOffMotor()
+                                    self.secMotor1.turnOffMotor()
+                                    self.secMotor2.turnOffMotor()
+                                    
+                                    del self.PrimMotor
+                                    del self.secMotor1
+                                    del self.secMotor2
+                                    
 
-                                print("Stopping Auxillary Sensors")
-                                
-                                del self.motorCurrentSensor1
-                                del self.motorCurrentSensor2
-                                del self.motorCurrentSensor3
-
+                                    print("Stopping Auxillary Sensors")
+                                    
+                                    del self.motorCurrentSensor1
+                                    del self.motorCurrentSensor2
+                                    del self.motorCurrentSensor3
+                                except:
+                                    print("are the motors connected?")
                                 #Stop SmartDot Data Collection
                                 self.smartDot.stopAccel()
                                 self.smartDot.stopGyro()
@@ -501,30 +502,64 @@ class BallSpinnerController():
            
     async def sensorHandler(self):
         while True: # Allow for thread to loop when repeated Start
-
-            #motorEncoder = AuxSensorSimulator(None)
-            while(self.currentSenorsOn): #runs until Sensors are
-                # bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
-                #                    0x00, 0x13, 0x41]) # Send Sensor Data for XL  
+            
+            #Make sure that the application handshake is completed before sending Auxillary Sensor Data
+            while(self.mode != BSCModes.WAITING_FOR_APP_INITILIZATION and (self.currentSenorsOn or self.motorEncodersOn)): #runs until Sensors are turned off
+               
+                if self.currentSenorsOn:
+                    # bytesData.extend(motorEncoder.readData()) 
+                    m1cData = self.motorCurrentSensor1.readData()
                 
-                # bytesData.extend(motorEncoder.readData()) 
-                m1cData = self.motorCurrentSensor1.readData()
-                self.data['motor_currents'][0] = "%.2f " % m1cData
-                print("CurrentSensor 1: %f" % m1cData) 
-                #This will Be to Send Current Sensor Data to BSA
+                    self.data['motor_currents'][0] = "%.2f " % m1cData
+                    #print("CurrentSensor 1: %f" % m1cData) 
+                
+                    #Send data to BSA
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x0C, SensorType.C1_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                    bytesData.extend(struct.pack('<f', m1cData))
+                    self.commsChannel.sendall(bytesData)
+                    
+                    m2cData = self.motorCurrentSensor2.readData()
+                    
+                    self.data['motor_currents'][1] ="%.2f " % m2cData
+                    #print("CurrentSensor 2: %f" % m2cData) 
+                    
+                    #Send data to BSA
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x0C, SensorType.C2_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-                m2cData = self.motorCurrentSensor2.readData()
-                self.data['motor_currents'][1] ="%.2f " % m2cData
-                print("CurrentSensor 2: %f" % m2cData) 
-                #This will Be to Send Current Sensor Data to BSA
-
-                m3cData = self.motorCurrentSensor3.readData()
-                self.data['motor_currents'][2] = "%.2f " % m3cData
-                print("CurrentSensor 3: %f" % m3cData) 
-                #This will Be to Send Current Sensor Data to BSA
-
+                    bytesData.extend(struct.pack('<f', m2cData))
+                    
+                    m3cData = self.motorCurrentSensor3.readData()
+                    self.data['motor_currents'][2] = "%.2f " % m3cData
+                    #print("CurrentSensor 3: %f" % m3cData) 
+                    #This will Be to Send Current Sensor Data to BSA
+                    
+                    #Send data to BSA
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x0C, SensorType.C3_SNSR]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                    bytesData.extend(struct.pack('<f', m3cData))
+#                    self.commsChannel.sendall(bytesData)
+                    
+                if self.motorEncodersOn and self.mode == BSCModes.TAKING_SHOT_DATA:
+                    me1cData =self.motorEncoder1.readData() #self.motorEncoder1.readData()
+                    print("Motor 1 RPM %.2f" % me1cData)
+                    #Send data to HMI
+                    self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData
+                    #Send data to BSA
+                    bytesData = bytearray([MsgType.B_A_SD_SENSOR_DATA,
+                                            0x00, 0x0C, SensorType.M1_ENC]) # Send B_A_SD_SENSOR_DATA for MG
+                    bytesData.extend([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+                    bytesData.extend(struct.pack('<f', me1cData))
+                    self.commsChannel.sendall(bytesData)
+                    print("Data Sent")
                 await asyncio.sleep(1)
 
+            await asyncio.sleep(1)
+   
     async def tCPscanAll(self, debugMode):
         #Wait until Application receives Start Scanner Message
         await self.startScanner.wait()

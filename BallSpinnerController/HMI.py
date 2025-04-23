@@ -1,14 +1,25 @@
-import tkinter as tk
-import threading
 from BallSpinnerController import BallSpinnerController
 from BallSpinnerController.hmi_gui_utility.scroll_frame import ScrollbarFrame
+from BallSpinnerController.hmi_gui_utility.animated_graph import *
+from BallSpinnerController.Motors.StepperMotor import StepperMotor
+from BallSpinnerController.SmartDots.iSmartDot import iSmartDot
+from BallSpinnerController.SmartDots.MetaMotion import MetaMotion
+from BallSpinnerController.SmartDots.SmartDotEmulator import SmartDotEmulator
+from .AuxSensors.MotorEncoder import MotorEncoder
+from mbientlab.warble import BleScanner
+import tkinter as tk
+from tkinter import ttk
+import six
+import threading
 import random
 import queue
-from BallSpinnerController.StepperMotor import StepperMotor
 import asyncio
+import threading
+import time
+import math
 
 class HMI:
-    def __init__(self, data):
+    def __init__(self, data, fullscreen=True):
         
         #This is our shared data dictionary that we check for changes in 
         self.data = data
@@ -27,22 +38,32 @@ class HMI:
         self.active_motor = None  # Track which motor's popup is active
         self.emergency_stop_clicks = 0
         self.is_emergency_stopped = False
-
+        self.smartDot = None
         self.bsc = None
+        self.graph_xl = None
+        self.data_graphs = []
+        self.motorEncodersOn = False
+        self.motorEncoder1 = None
 
 ################################################### Initialize UI ###################################################\
-        self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
-        # Remove window decorations (title bar, borders)
-        self.root.overrideredirect(True)
-        # Set window size to full screen
+        if fullscreen:
+            self.root.attributes('-fullscreen', True)  # Set the window size to 600x300 pixels
+            # Remove window decorations (title bar, borders)
+            self.root.overrideredirect(True)
+            # Set window size to full screen
+            # Keep window on top (optional)
+            self.root.attributes("-topmost", True)
+            self.root.tk.call('tk', 'scaling', .91)  # 1.0 is 100% scaling
 
-        # Keep window on top (optional)
-        self.root.attributes("-topmost", True)
+
         # self.root.geometry("800x480")
         self.screen_width = 800
         self.screen_height = 480
         self.root.geometry(f"{self.screen_width}x{self.screen_height}+0+0")
 
+        #For handling the closing of the application, calls self.on_close()
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.after_id = 0
         
         self.root.title("Ball Spinner HMI")
         self.root.configure(bg=self.data["bg_color"])  # Set the background color of the window
@@ -76,6 +97,9 @@ class HMI:
         #Local only elements
         self.motor_controller_window = self.create_motor_controller_window()
         self.motor = None
+        self.sd_connect_window = self.create_SD_connect_window()
+        self.sd_connect_toggle_button = self.toggle_SD_connect_window_button()
+
         #List of elements to initially hide
 
         #initialize stack for back button
@@ -98,6 +122,7 @@ class HMI:
             self.reset_button,
             self.protocol_history_window,
             self.show_protocol_button,
+            self.sd_connect_toggle_button,
         ]
 
         #self.is_protocol_visible = False
@@ -128,6 +153,7 @@ class HMI:
         #False means it is hidden, true means it is shown
         self.button_toggleable_elements = {
             self.protocol_history_window : False,
+            self.sd_connect_window : False
         }
 
         #self.shown_ui_elements = [element for element in self.all_ui_elements if element not in self.hidden_ui_elements]
@@ -148,7 +174,7 @@ class HMI:
             self.reset_button,
             self.motor_controller_window,
             self.emergency_stop_button,
-
+            self.sd_connect_toggle_button,
         ]
         self.hide_ui_elements(self.local_ui_elements_to_show)
 
@@ -188,6 +214,11 @@ class HMI:
         self.show_ui_elements(ui_elements_to_show)
         self.hide_ui_elements(ui_elements_to_hide)
 
+    def on_close(self):
+        if hasattr(self, 'after_id'):
+            print("Destructor Kaboom")
+            self.root.after_cancel(self.after_id)
+        self.root.destroy()
 
     # Update Display
     def change_page(self, ui_elements_to_show, ui_elements_to_hide):
@@ -203,7 +234,7 @@ class HMI:
 ################################################### Initialize Loops ###################################################\
     def run(self):
         self.root.mainloop()
-
+    
     def check_for_updates(self):
         updates = {
             self.e_label: self.data["error_text"],
@@ -233,7 +264,28 @@ class HMI:
         while not self.data["protocol_queue"].empty():
             self.update_protocol_list(self.data["protocol_queue"].get())
 
-        self.root.after(self.ui_update_frequency, self.check_for_updates)
+        #Update SmartDot Data Queues
+        if self.smartDot is not None: #and (self.smartDot is MetaMotion or self.smartDot is SmartDotEmulator):
+            if isinstance(self.smartDot, MetaMotion):
+                for i in range(len(self.data_graphs)):
+                    #print(f"Gyro data {self.smartDot.data_arr[2]}")
+                    self.data_graphs[i].queue.put(self.smartDot.data_arr[i])
+               
+            
+        if self.popup_speed.cget("text") != "" and self.active_motor is not None:
+            print(type(self.motorEncoder1))
+            if self.motorEncodersOn and self.motorEncoder1 is not None:
+                me1cData = self.motorEncoder1.readData()
+                #print("Motor 1 RPM %.2f" % me1cData)
+                #Send data to HMI
+                self.data['motor_encoder_rpms'][0] = "%.2f " % me1cData
+            rpm = float(self.popup_speed.cget("text").split(" ")[1])# != self.data['motor_encoder_rpms'][0]:
+            # print(f"{type(rpm)} rpm : {rpm}")
+            if rpm != self.data["motor_encoder_rpms"][0]:
+                print("overwrote the rpm")
+                self.popup_speed.config(text = f"Speed: {self.data['motor_encoder_rpms'][0]} RPM")
+                
+        self.after_id = self.root.after(self.ui_update_frequency, self.check_for_updates)
 
 ################################################### Basic Data Labels ###################################################
     def build_mode_and_message_labels(self):
@@ -293,6 +345,287 @@ class HMI:
         label.grid(row=0, column=0) 
         self.protocol_labels.append(label)
 
+################################################### Local SD Connect ###################################################
+    def toggle_SD_connect_window_button(self):
+        btn = tk.Button(self.root, text="Local SmartDot", command = self.toggle_SD_connect_window)
+        btn.place(x=650, y=230)
+        return btn
+    def toggle_SD_connect_window(self):
+        if self.button_toggleable_elements[self.sd_connect_window] == False:
+            self.sd_connect_window = self.create_SD_connect_window()
+            self.button_toggleable_elements[self.sd_connect_window] = True
+
+        else:
+            self.fully_close_SD_connection()
+            
+    def create_SD_connect_window(self):
+        x = 375
+        y = 50
+        
+        # Create a frame inside self.frame
+        frame = tk.Frame(self.root, bg="lightgray", padx=10, pady=10, borderwidth=2, relief="ridge", width = 400, height = 305)
+        frame.place(x=x, y=y)
+        frame.pack_propagate(False) #Don't shrink frame to content
+
+        self.connect_sd = tk.Button(frame,text="Scan SD", command = self.handle_smart_dot_btn)
+        self.connect_sd.pack(in_=frame)
+
+        self.connect_sd_buttons = [self.connect_sd]
+      
+        #used to track which stage of connection we are in
+        #0 means we have just clicked scan, it will get incremented to 1. if we click button again it becomes 2 
+        #and the scan will see and stop
+        self.sd_cmd_idx = 0
+        self.sd_thread = None
+        self.sd_thread2 = None
+        close_btn = tk.Button(frame, text="Close SD Connection", command=self.fully_close_SD_connection)
+        close_btn.pack(side="bottom", pady = 2)
+        return frame
+    def fully_close_SD_connection(self):
+        if len(self.data_graphs) > 0:
+            self.close_sd_graphs()
+            print("closing graphs")
+        print("closing SD window")
+        self.sd_connect_window.place_forget()
+        if isinstance(self.smartDot, MetaMotion) or isinstance(self.smartDot, SmartDotEmulator):
+            self.smartDot.disconnect()
+            print("closing SD bluetooth connection")
+            self.smartDot = None
+            print("emptying smartdot object")
+        self.button_toggleable_elements[self.sd_connect_window] = False
+    def unpack_connect_elements(self):
+        for i in self.connect_sd_buttons:
+            i.pack_forget()
+        self.pack_connected_elements()
+
+    def pack_connected_elements(self):
+        self.sd_connected_label = tk.Label(self.sd_connect_window, text=f"Connected to {self.smartDot._MAC_ADDRESS}", font =("Arial",10))
+        self.sd_connected_label.pack(in_=self.sd_connect_window)
+
+        self.local_SD_config = self.create_local_SD_window()
+
+    def handle_smart_dot_btn(self):
+        if self.sd_thread is None:
+            self.sd_thread = threading.Thread(target=self.scanAll)
+            self.sd_thread.start()
+        # availDevices = self.scanAll()
+        self.sd_cmd_idx += 1
+
+    def handle_SD_connect_btn(self, i):
+        if self.sd_thread2 is None:
+            self.sd_thread2 = threading.Thread(target=self.connect_to_chosen_SD, args=(i,))
+            self.sd_thread2.start()
+
+    def connect_to_chosen_SD(self, btn_idx):
+        try:
+            #self.sd_thread.join() #Complete the scanAll Thread
+            print("Active threads:")
+            for thread in threading.enumerate():
+                print(f"  {thread.name}")
+            #Jank way to grab Correct MAC Address: Creates Keys and gra
+            print(f"Button index {btn_idx}")
+            smartDotMAC = tuple(self.availDevicesType.keys())[btn_idx]
+            smartDot = self.availDevicesType[smartDotMAC]()
+            self.smartDot = MetaMotion(tuple(self.availDevices.keys())[btn_idx], is_local=True)
+            smartDotConnect = self.smartDot.connect(smartDotMAC)
+            self.sd_cmd_idx += 1
+
+            self.unpack_connect_elements()
+        except Exception as e:
+            self.data["error_text"] = f"{e}"
+
+    def scanAll(self):
+        self.availDevices = {}
+        self.availDevicesType = {}
+
+        self.smartDot : iSmartDot = [MetaMotion(), SmartDotEmulator()]
+
+        self.availDevices["11:11:11:11:11:11"] = "smartDotSimulator" 
+        self.availDevicesType["11:11:11:11:11:11"] = SmartDotEmulator
+
+        #self.mode = "Scanning"
+        selection = -1
+        #Continuously rescans for MetaWear Devices
+        print("scanning for devices...")
+
+        #Check if the Bluetooth device has ANY UUID's from any of the iSmartDot Modules
+        def handler(result):
+            for listedConnect in range(len(self.smartDot)):
+                if result.has_service_uuid(self.smartDot[listedConnect].UUID()):
+                    self.availDevices[result.mac] = result.name
+                    if(isinstance(self.smartDot[listedConnect],MetaMotion)):
+                            self.availDevicesType[result.mac] = MetaMotion
+
+        BleScanner.set_handler(handler)
+        BleScanner.start()
+        
+        try :
+            i = 0
+            while True: 
+                #print(f"cmd idx: {self.sd_cmd_idx}")
+                # #update list every 1s
+                time.sleep(1.0)  
+                #print all BLE devices found and append to connectable list                
+                count = 0
+                for address, name in six.iteritems(self.availDevices):
+                    if count >= i :
+                        btn = tk.Button(self.sd_connect_window, text=f"{address}",  font=("Arial", 10,), command=lambda i=i: self.handle_SD_connect_btn(i))
+                        btn.pack(in_=self.sd_connect_window)
+                        self.connect_sd_buttons.append(btn)
+                        i += 1
+                    count += 1
+                if self.sd_cmd_idx > 1:
+                    BleScanner.stop()
+                    print("exiting the scan")
+                    break# self.availDevices
+        except Exception as e: #Called when KeyInterrut ^C is called
+            BleScanner.stop()
+            self.data["error_text"] = f"Error in scanAll {e}"
+            return
+
+    ############### Local mode SD config window ###############
+    def create_local_SD_window(self):
+        sd_frame = tk.Frame(self.root, bg="lightgray", padx=5, pady=5, borderwidth=2, relief="ridge")
+
+        # Add labels inside the SD window
+        self.local_sd_title = tk.Label(sd_frame, text="SD Information", font=("Arial", 14, "bold"), bg="lightgray")
+        self.local_sd_xl = tk.Label(sd_frame, text="XL: --", bg="lightgray")
+        self.local_sd_gy = tk.Label(sd_frame, text="GY: --", bg="lightgray")
+        self.local_sd_mg = tk.Label(sd_frame, text="MG: --", bg="lightgray")
+        self.local_sd_lt = tk.Label(sd_frame, text="LT: --", bg="lightgray")
+
+        #create List of XL Rates to set
+        XLSampleRates = [12.5, 25, 50, 100, 200, 400, 800, 1600] 
+        GYSampleRates = [25, 50, 100, 200, 400, 800, 1600, 3200, 6400]
+        MGSampleRates = [2, 6, 8, 10, 15, 20, 25, 30]
+        LTSampleRates = [.5, 1, 2, 5, 10, 20]
+
+        #create lists of ranges
+        XLRanges = [2, 4, 8, 16,]
+        GYRanges = [125, 250, 500, 1000, 2000,]
+        MGRanges = [2500, 4, 8, 16, 8, 16, 32, 64]
+        LTRanges = [600, 1300, 8000, 16000, 32000, 64000,]
+        
+        lists = [XLSampleRates, XLRanges, GYSampleRates, GYRanges, MGSampleRates, MGRanges, LTSampleRates, LTRanges]
+        labels = [
+            "XL Sample Rates", "XL Ranges",
+            "GY Sample Rates", "GY Ranges",
+            "MG Sample Rates", "MG Ranges",
+            "LT Sample Rates", "LT Ranges"
+        ]
+
+        self.SD_dropdowns = []
+        def on_select(event):
+            selected_value = event.widget.get()
+            print("Selected:", selected_value)
+        for i, (label_text, values) in enumerate(zip(labels, lists)):
+            row = i // 2
+            col = i % 2
+
+            label = tk.Label(sd_frame, text=label_text, bg="lightgray")
+            label.grid(row=row * 2, column=col, padx=10, pady=(5, 0), sticky="w")
+
+            combo = ttk.Combobox(sd_frame, values=values, state="readonly")
+            combo.current(0)
+            combo.bind("<<ComboboxSelected>>", on_select)
+            combo.grid(row=row * 2 + 1, column=col, padx=10, pady=(0, 10), sticky="we")
+
+            self.SD_dropdowns.append(combo)
+
+        sd_frame.columnconfigure(0, weight=1)
+        sd_frame.columnconfigure(1, weight=1)
+
+        submit_btn = tk.Button(sd_frame, text="Submit", command=self.submit_sd_settings)
+        submit_btn.grid(row=8, column=0, columnspan=2,)
+
+        sd_frame.pack(in_=self.sd_connect_window)
+        
+        return sd_frame
+    def submit_sd_settings(self):
+        self.SD_config_values = [combo.get() for combo in self.SD_dropdowns]
+        for i in range(len(self.SD_config_values)):
+            self.SD_config_values[i] = float(self.SD_config_values[i])
+            self.SD_config_values[i] = math.trunc(self.SD_config_values[i])
+            #print(f"type: {type(self.SD_config_values[i])}, Value: {self.SD_config_values[i]}")
+        print("Submitted SD Settings:", self.SD_config_values)
+        self.smartDot.setSampleRates(XL=int(self.SD_config_values[0]))
+        self.smartDot.setRanges(XL=int(self.SD_config_values[1]))
+        self.smartDot.setSampleRates(GY=int(self.SD_config_values[2]))
+        self.smartDot.setRanges(GY=int(self.SD_config_values[3]))
+        self.smartDot.setSampleRates(MG=int(self.SD_config_values[4]))
+        self.smartDot.setRanges(MG=int(self.SD_config_values[5]))
+        self.smartDot.setSampleRates(LT=int(self.SD_config_values[6]))
+        self.smartDot.setRanges(LT=int(self.SD_config_values[7]))
+
+        self.unpack_SD_local_config_window()
+        self.SD_data_graphs = self.build_SD_data_graphs()
+    def unpack_SD_local_config_window(self):
+        self.local_SD_config.pack_forget()
+    def pack_local_SD_labels(self, sd_frame):
+         # Pack elements inside the SD window
+        self.local_sd_title.pack(in_=sd_frame, pady=5)
+        self.local_sd_xl.pack(in_=sd_frame, pady=5)
+        self.local_sd_gy.pack(in_=sd_frame, pady=5)
+        self.local_sd_mg.pack(in_=sd_frame, pady=5)
+        self.local_sd_lt.pack(in_=sd_frame, pady=5)
+    ############### Local mode SD GRAPHS!! ###############
+    def build_SD_data_graphs(self):
+        graph_frame = tk.Frame(self.root, padx=7, pady=7)
+        graph_frame.pack(in_=self.sd_connect_window)
+
+        labels = [
+            ("XL", 0, 0),
+            ("MG", 0, 1),
+            ("GY", 1, 0),
+            ("LT", 1, 1),
+        ]
+        data_queues = [
+            Queue(),
+            Queue(),
+            Queue(),
+            Queue()
+        ]
+
+        graph_update_speed = 45
+        self.smartDot.startAccel()
+        self.smartDot.startMag()
+        self.smartDot.startGyro()
+        self.smartDot.startLight()
+        simulate_data_feed(data_queues[2])
+        for i, (text, row, col) in enumerate(labels):
+            # Create subframe for label + graph
+            subframe = tk.Frame(graph_frame)
+            subframe.grid(row=row, column=col, padx=10, pady=0)
+
+            # Add label at top of subframe
+            label = tk.Label(subframe, text=text, borderwidth=2, relief="groove", width=10)
+            label.grid(row=0, column=0, pady=1)
+
+            # Add graph below the label
+            bIsForBool = True
+            if i == 2 or i == 0:
+                bIsForBool=False
+            graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed,changey=bIsForBool) 
+            graph.canvas_widget.grid(row=1, column=0)
+            self.data_graphs.append(graph)
+        # self.graph_xl = RealTimeGraph(subframe, data_queues[0], graph_update_speed) 
+        # self.graph_xl.canvas_widget.grid(row=1, column=0)
+        # self.data_graphs.append(self.graph_xl)
+        # self.sd_graph_close_btn = tk.Button(graph_frame, text="Close Graphs", command = self.close_sd_graphs)
+        # self.sd_graph_close_btn.grid(row=2, column=0, columnspan=2,)
+        return graph_frame
+    def close_sd_graphs(self):
+        self.smartDot.stopAccel()
+        self.smartDot.stopMag()
+        self.smartDot.stopGyro()
+        self.smartDot.stopLight()
+        self.SD_data_graphs.pack_forget()
+
+        for i in self.data_graphs:
+            i.canvas_widget.destroy()
+            
+        self.data_graphs.clear()
+
 ################################################### Local Motor Controller ###################################################
     def create_motor_controller_window(self):
         x = 200
@@ -310,7 +643,7 @@ class HMI:
 
         
         # Create a label inside mc_frame
-        self.selected_motor = tk.Label(mc_frame, bg="lightgray", text=f"Select a motor button", font=("Arial", 12,))
+        self.selected_motor = tk.Label(mc_frame, bg="lightgray", text=f"Hit Motor 1 Btn", font=("Arial", 12,))
         self.selected_motor.grid(row=0, column=0, columnspan=3, pady=5)
 
         # Create buttons inside mc_frame using grid (instead of pack)
@@ -331,16 +664,25 @@ class HMI:
     def change_motor_speed(self, btn_idx):
         if self.motor.state == False:
             self.motor.turnOnMotor()
+            #Make motor encoder object when we activate our motor
+            try:
+                self.motorEncoder1 = MotorEncoder()
+                self.motorEncodersOn = True
+            except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
+                    print(f"Error When attempting to set up Motor Encoder: {e}")      
+
         increment = self.motor_button_text_list[btn_idx]
         if btn_idx > 2:
             increment = int(increment.split("+")[1])
         else:
             increment = int(increment)
-        print(f"Button idx {btn_idx}")
-        print(f"Changing motor speed by: {increment}")
-        self.motor.changeSpeed(self.motor.rpm + increment)
-        print(f"Motor speed should now be: {self.motor.rpm}")\
+        if self.motor.rpm + increment > 0:
+            self.motor.changeSpeed(self.motor.rpm + increment)
+            print(f"Changing motor speed by: {increment}")
+            print(f"Motor speed should now be: {self.motor.rpm}")
 
+        else:
+            print("cant set motor rpm below 0")
         self.update_motor_controller_text()
 
 ################################################### Motor Data popup ###################################################
@@ -352,7 +694,6 @@ class HMI:
         self.popup_title = tk.Label(popup_frame, text="Motor Details", font=("Arial", 14, "bold"), bg="lightgray")
         self.popup_current = tk.Label(popup_frame, text="", bg="lightgray")
         self.popup_speed = tk.Label(popup_frame, text="", bg="lightgray")
-        self.popup_temp = tk.Label(popup_frame, text="", bg="lightgray")
         self.popup_status = tk.Label(popup_frame, text="", bg="lightgray")
 
         # Close button (alternative way to close)
@@ -361,7 +702,6 @@ class HMI:
         # Pack elements inside the popup frame
         self.popup_title.pack(in_=popup_frame,pady=5)
         self.popup_speed.pack(in_=popup_frame,)
-        self.popup_temp.pack(in_=popup_frame,)
         self.popup_current.pack(in_=popup_frame,)
         self.popup_status.pack(in_=popup_frame,)
         self.close_button.pack(in_=popup_frame, pady=5)
@@ -379,7 +719,6 @@ class HMI:
         self.popup_current.config(text=f"Current: {self.data['motor_currents'][motor_id-1]}A")
         self.popup_title.config(text=f"Motor {motor_id} Details")
         self.popup_speed.config(text=f"Speed: {100 + motor_id * 10} RPM")
-        self.popup_temp.config(text=f"Temperature: {40 + motor_id}°C")
         self.popup_status.config(text=f"Status: Running")
 
         # Place the popup in the UI
@@ -474,7 +813,7 @@ class HMI:
 
         # Create buttons that toggle the popup
         for i in range(3):
-            button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="lightblue", width=10, height=2,
+            button = tk.Button(grid_frame, text=f"Motor {i+1}", bg="gray60", width=10, height=2,
                                command=lambda m=i+1: self.toggle_popup(m))
             button.grid(in_=grid_frame, row=0, column=i, padx=10, pady=10)
         return grid_frame
@@ -522,18 +861,21 @@ class HMI:
         self.data["error_text"] = f"Emergency Stopped motor"
         self.data["estop"] = True
         self.motor.turnOffMotor()
+        del self.motor
+        self.motor = StepperMotor(GPIOPin=12)
+        self.motor.turnOnMotor(0)
         print("Emergency Stopped Motor")
 
     def close_window(self):
-        self.root.destroy()
+        self.on_close()
+
         # Set the error text and update the error label
 
     #TODO: function for back button from main local or bsc screen    
     # Hide necessary UI elements. 
     # If back to Mode selection screen:     Close server connection if open     
-    def reset_to_init_state(self):
+    def stop_bsc(self):
         self.data["close_bsc"] = True
-        self.full_reset_ui()
         
     def show_protocol_history(self):
         show = [None]
@@ -575,9 +917,11 @@ class HMI:
 ################################################### Initialize Local Mode ###################################################
     def launch_local_mode(self):
         # self.local_ui_elements_to_show = self.initial_ui_elements_to_hide
-        self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button}
+        self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button, }
         self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
         self.motor =  StepperMotor(GPIOPin=12)
+        self.stop_bsc()
+
 
 
 
@@ -606,10 +950,9 @@ if __name__ == "__main__":
             "lt": "",
             "mode": "",
             "message_type": "",
-            "bg_color": 'dodgerblue2',
+            "bg_color": 'red',
             "geometry": "600x300",  # Set the window size to 600x300 pixels
             "title": "Ball Spinner Controller GUI",
-            "configure": 'dodgerblue2',  # Set the background color of the window
             "error_text": "",
             "i": 0
         }

@@ -25,9 +25,10 @@ Pre-Requesites
 
         sudo apt-get install -y gcc-6 g++-6 clang-3.8    
         sudo apt-get install build-essential cmake
+        sudo apt install python3-matplotlib
 
 
-3. Configure settings for ADC
+4. Configure settings for ADC
     a) confirm
 
     b) Install the following libraries to use the ADS_1115 ADC:

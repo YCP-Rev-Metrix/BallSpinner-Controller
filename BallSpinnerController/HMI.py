@@ -97,6 +97,7 @@ class HMI:
         #Local only elements
         self.motor_controller_window = self.create_motor_controller_window()
         self.motor = None
+        self.motor2 = None
         self.sd_connect_window = self.create_SD_connect_window()
         self.sd_connect_toggle_button = self.toggle_SD_connect_window_button()
 
@@ -215,6 +216,13 @@ class HMI:
         self.hide_ui_elements(ui_elements_to_hide)
 
     def on_close(self):
+        try:
+            if self.motor is not None:
+                self.motor.turnOffMotor()
+            if self.motor2 is not None:
+                self.motor2.turnOffMotor()
+        except:
+            print("couldn't destroy motors, they prob dont exist")
         if hasattr(self, 'after_id'):
             print("Destructor Kaboom")
             self.root.after_cancel(self.after_id)
@@ -664,13 +672,16 @@ class HMI:
     def change_motor_speed(self, btn_idx):
         if self.motor.state == False:
             self.motor.turnOnMotor()
+           
             #Make motor encoder object when we activate our motor
             try:
                 self.motorEncoder1 = MotorEncoder()
                 self.motorEncodersOn = True
             except Exception as e:  # Assumed Exception is caused from broken pipe, can look into another time
                     print(f"Error When attempting to set up Motor Encoder: {e}")      
-
+        if self.motor2.state == False: #Temp motor 2 synchronization
+            self.motor2.turnOnMotor()
+            
         increment = self.motor_button_text_list[btn_idx]
         if btn_idx > 2:
             increment = int(increment.split("+")[1])
@@ -680,6 +691,10 @@ class HMI:
             self.motor.changeSpeed(self.motor.rpm + increment)
             print(f"Changing motor speed by: {increment}")
             print(f"Motor speed should now be: {self.motor.rpm}")
+        if self.motor2.rpm + increment > 0:
+            self.motor2.changeSpeed(self.motor2.rpm + increment)
+            # print(f"Changing motor speed by: {increment}")
+            # print(f"Motor speed should now be: {self.motor2.rpm}")
 
         else:
             print("cant set motor rpm below 0")
@@ -862,6 +877,8 @@ class HMI:
         self.data["estop"] = True
         self.motor.turnOffMotor()
         del self.motor
+        self.motor2.turnOffMotor()
+        del self.motor2
         # self.motor = StepperMotor(GPIOPin=12)
         # self.motor.turnOnMotor(0)
         print("Emergency Stopped Motor")
@@ -913,13 +930,16 @@ class HMI:
         # #this is actually a toggle
         # self.show_protocol_history()
         self.motor = None
+        self.motor2 = None
 
 ################################################### Initialize Local Mode ###################################################
     def launch_local_mode(self):
         # self.local_ui_elements_to_show = self.initial_ui_elements_to_hide
         self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button, }
         self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
-        self.motor =  StepperMotor(GPIOPin=12)
+        self.motor = StepperMotor(GPIOPin=12)
+        self.motor2 = StepperMotor(GPIOPin=24)
+
         self.stop_bsc()
 
 

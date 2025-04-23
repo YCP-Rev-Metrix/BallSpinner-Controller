@@ -862,8 +862,8 @@ class HMI:
         self.data["estop"] = True
         self.motor.turnOffMotor()
         del self.motor
-        self.motor = StepperMotor(GPIOPin=12)
-        self.motor.turnOnMotor(0)
+        # self.motor = StepperMotor(GPIOPin=12)
+        # self.motor.turnOnMotor(0)
         print("Emergency Stopped Motor")
 
     def close_window(self):

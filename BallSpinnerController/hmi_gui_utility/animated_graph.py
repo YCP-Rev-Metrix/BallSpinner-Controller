@@ -13,12 +13,13 @@ class RealTimeGraph:
         self.queue = data_q
         self.m = 0
         self.changey = changey
+        self.fullscreen = False
         #master.title("Real-time XYZ Graph")
 
-        dpi = 50  # Adjust as needed
-        figsize = (150 / dpi, 80 / dpi)  # (width_inches, height_inches)
+        self.dpi = 50  # Adjust as needed
+        figsize = (150 / self.dpi, 80 / self.dpi)  # (width_inches, height_inches)
 
-        self.fig, self.ax = plt.subplots(figsize=figsize, dpi=dpi)
+        self.fig, self.ax = plt.subplots(figsize=figsize, dpi=self.dpi)
         if xl_config != None:
             pass 
             #set the y lim to be that of the XL Range Parameter
@@ -42,6 +43,10 @@ class RealTimeGraph:
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=master)
         self.canvas_widget = self.canvas.get_tk_widget()
+        
+        #ensure geometry info is available
+        self.canvas_widget.update_idletasks()
+
         #self.canvas_widget.pack()
 
         self.ani = FuncAnimation(self.fig, self.update_graph, interval=update_speed, blit=False)
@@ -51,6 +56,7 @@ class RealTimeGraph:
         t = 0
         while not self.queue.empty():
             data = self.queue.get()
+            
             t = data['timestamp']
             if not math.isinf(data['x']) and not math.isinf(data['y']) and not math.isinf(data['z']):
                 self.time_data.append(t)
@@ -82,6 +88,37 @@ class RealTimeGraph:
 
         return self.line_x, self.line_y, self.line_z
 
+    # Toggle fullscreen mode for the graph display
+    def toggle_fullscreen(self):
+        print(f"Previous Graph Size: ({self.canvas_widget.winfo_width()}, {self.canvas_widget.winfo_height()})")
+
+        if self.fullscreen:
+            self.canvas_widget.config(width=150,height = 80)
+        else:
+           self.canvas_widget.config(width=600,height = 300)
+        self.fullscreen = not self.fullscreen
+        self.canvas_widget.update_idletasks()
+    def increase_font_size(self, increment=2):
+        # Update axis label font sizes
+        current_xlabel_size = self.ax.xaxis.label.get_size()
+        current_ylabel_size = self.ax.yaxis.label.get_size()
+
+        self.ax.set_xlabel(self.ax.get_xlabel(), fontsize=current_xlabel_size + increment)
+        self.ax.set_ylabel(self.ax.get_ylabel(), fontsize=current_ylabel_size + increment)
+
+        # Update tick font sizes
+        for tick in self.ax.xaxis.get_major_ticks():
+            tick.label.set_fontsize(tick.label.get_size() + increment)
+        for tick in self.ax.yaxis.get_major_ticks():
+            tick.label.set_fontsize(tick.label.get_size() + increment)
+
+        # Update legend text font sizes
+        legend = self.ax.get_legend()
+        if legend:
+            for text in legend.get_texts():
+                text.set_fontsize(text.get_fontsize() + increment)
+
+        self.canvas.draw_idle()
 
 # Simulated data feed (can be run in another thread)
 def simulate_data_feed(data_q):

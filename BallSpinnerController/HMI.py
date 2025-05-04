@@ -87,7 +87,7 @@ class HMI:
         self.bsc_button = self.create_BSC_button()
         self.local_mode_button = self.create_local_mode_button()
         self.reset_button = self.create_reset_button()
-
+        
         self.protocol_history_list = []
         self.protocol_history_circular_buffer_index = 0
         self.protocol_history_circular_buffer_size = 50
@@ -180,6 +180,8 @@ class HMI:
         self.hide_ui_elements(self.local_ui_elements_to_show)
 
 
+        #testing 
+        self.SD_data_graphs  = self.build_SD_data_graphs_offline_test()
 
         
 
@@ -281,7 +283,7 @@ class HMI:
                
             
         if self.popup_speed.cget("text") != "" and self.active_motor is not None:
-            print(type(self.motorEncoder1))
+           # print(type(self.motorEncoder1))
             if self.motorEncodersOn and self.motorEncoder1 is not None:
                 me1cData = self.motorEncoder1.readData()
                 #print("Motor 1 RPM %.2f" % me1cData)
@@ -567,6 +569,8 @@ class HMI:
 
         self.unpack_SD_local_config_window()
         self.SD_data_graphs = self.build_SD_data_graphs()
+   
+
     def unpack_SD_local_config_window(self):
         self.local_SD_config.pack_forget()
     def pack_local_SD_labels(self, sd_frame):
@@ -587,6 +591,8 @@ class HMI:
             ("GY", 1, 0),
             ("LT", 1, 1),
         ]
+        self.SD_graph_labels = []
+        self.SD_subframe_list = []
         data_queues = [
             Queue(),
             Queue(),
@@ -604,24 +610,102 @@ class HMI:
             # Create subframe for label + graph
             subframe = tk.Frame(graph_frame)
             subframe.grid(row=row, column=col, padx=10, pady=0)
-
+            self.SD_subframe_list.append(subframe)
             # Add label at top of subframe
             label = tk.Label(subframe, text=text, borderwidth=2, relief="groove", width=10)
             label.grid(row=0, column=0, pady=1)
+            self.SD_graph_labels.append(label)
 
             # Add graph below the label
-            bIsForBool = True
+            bIsForBool = True #This is a bool that controls whether the y-axis resizes... idk why I named it this, but it shall persist.
             if i == 2 or i == 0:
                 bIsForBool=False
             graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed,changey=bIsForBool) 
             graph.canvas_widget.grid(row=1, column=0)
+            #Bind on click event
+            # graph.canvas_widget.bind("<Button-1>", lambda event, g=graph: self.on_graph_click(event, g))
             self.data_graphs.append(graph)
-        # self.graph_xl = RealTimeGraph(subframe, data_queues[0], graph_update_speed) 
-        # self.graph_xl.canvas_widget.grid(row=1, column=0)
-        # self.data_graphs.append(self.graph_xl)
-        # self.sd_graph_close_btn = tk.Button(graph_frame, text="Close Graphs", command = self.close_sd_graphs)
-        # self.sd_graph_close_btn.grid(row=2, column=0, columnspan=2,)
+
         return graph_frame
+    def build_SD_data_graphs_offline_test(self):
+        graph_frame = tk.Frame(self.root, padx=7, pady=7)
+        graph_frame.pack(in_=self.sd_connect_window)
+        labels = [
+            ("XL", 0, 0),
+            ("MG", 0, 1),
+            ("GY", 1, 0),
+            ("LT", 1, 1),
+        ]
+        self.SD_graph_labels = []
+        self.SD_subframe_list = []
+        data_queues = [
+            Queue(),
+            Queue(),
+            Queue(),
+            Queue()
+        ]
+
+        graph_update_speed = 45
+        for i in data_queues:
+            simulate_data_feed(i)
+
+        for i, (text, row, col) in enumerate(labels):
+            # Create subframe for label + graph
+            subframe = tk.Frame(graph_frame)
+            subframe.grid(row=row, column=col, padx=10, pady=0)
+            self.SD_subframe_list.append(subframe)
+            # Add label at top of subframe
+            label = tk.Label(subframe, text=text, borderwidth=2, relief="groove", width=10)
+            label.grid(row=0, column=0, pady=1)
+            self.SD_graph_labels.append(label)
+            # Add graph below the label
+            bIsForBool = True #This is a bool that controls whether the y-axis resizes... idk why I named it this, but it shall persist.
+            if i == 2 or i == 0:
+                bIsForBool=False
+            graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed,changey=bIsForBool) 
+            graph.canvas_widget.grid(row=1, column=0)
+            #Bind on click event
+            graph.canvas_widget.bind("<Button-1>", lambda event, g=graph: self.on_graph_click(event, g))
+            self.data_graphs.append(graph)
+
+        return graph_frame
+    
+    #toggle fullscreen of a graph
+    def on_graph_click(self, event, graph):
+        print("Graph clicked:", graph)
+        # Example: toggle a property
+        index = 0
+        for i in self.data_graphs: #hide other graphs.
+            if i != graph:
+                subframe = self.SD_subframe_list[index]
+                if subframe.winfo_ismapped():
+                    subframe.grid_remove()
+                    i.increase_font_size(increment = -10)
+                else:
+                    subframe.grid()
+                    i.increase_font_size(increment = 10)
+              
+                label = self.SD_graph_labels[index]
+                if label.winfo_ismapped():
+                    label.grid_forget()
+                else:
+                    label.grid(row=0, column=0, pady=1)
+                
+            index += 1  
+        #if the graph is fullscreen already, lets use pack to put it back
+        #else we will place the graph_frame in the right spot by using place()
+        if graph.fullscreen:
+            self.SD_data_graphs.place_forget()
+            self.SD_data_graphs.pack(in_=self.sd_connect_window)
+        else:
+            self.SD_data_graphs.pack_forget()  # Remove current packing
+            self.SD_data_graphs.place(x=100,y=60)
+            
+
+        #make our graph scale!
+        graph.toggle_fullscreen() 
+
+       
     def close_sd_graphs(self):
         self.smartDot.stopAccel()
         self.smartDot.stopMag()

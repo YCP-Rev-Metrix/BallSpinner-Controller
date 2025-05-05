@@ -248,11 +248,11 @@ def testAbsEncoder():
 
 from BallSpinnerController.Motors.StepperMotor import StepperMotor
 from BallSpinnerController.AuxSensors.MotorEncoder import MotorEncoder
-blahblah = StepperMotor(12)
-blah = StepperMotor(24)
-blahblah.turnOnMotor()
+blahblah = StepperMotor(16)
+blah = StepperMotor(20)
+blahblah.turnOnMotor(100)
 
-blah.turnOnMotor()
+blah.turnOnMotor(100)
 d = MotorEncoder()
 
 while True:

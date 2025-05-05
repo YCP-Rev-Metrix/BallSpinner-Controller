@@ -181,7 +181,7 @@ class HMI:
 
 
         #testing 
-        self.SD_data_graphs  = self.build_SD_data_graphs_offline_test()
+        # self.SD_data_graphs  = self.build_SD_data_graphs_offline_test()
 
         
 
@@ -621,6 +621,7 @@ class HMI:
             if i == 2 or i == 0:
                 bIsForBool=False
             graph = RealTimeGraph(subframe, data_queues[i], graph_update_speed,changey=bIsForBool) 
+            graph.canvas_widget.bind("<Button-1>", lambda event, g=graph: self.on_graph_click(event, g))
             graph.canvas_widget.grid(row=1, column=0)
             #Bind on click event
             # graph.canvas_widget.bind("<Button-1>", lambda event, g=graph: self.on_graph_click(event, g))

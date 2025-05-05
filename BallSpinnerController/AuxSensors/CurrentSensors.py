@@ -11,7 +11,7 @@ class CurrentSensor(iAuxSensor):
         adc = ads.ADS1115(i2cConfig)
         ads.gain = 1        
         adc_inputPin = [ads.P0, ads.P1, ads.P2]
-        self.chan = AnalogIn(adc, adc_inputPin[ADC_IN])
+        self.chan = AnalogIn(adc, adc_inputPin[1])
         self.ref  = AnalogIn(adc, ads.P3) 
         #ASSUMING 5v RAIL IS PASSED in to Pin 3
             

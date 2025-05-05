@@ -5,11 +5,11 @@ import threading
 
 class MotorEncoder(iAuxSensor):
     # GPIO pins
-    PIN_A = 18
+    PIN_A = 25
     PIN_B = 27
-    PIN_I = 14
+    PIN_I = 7
 
-    def __init__(self, PIN_A = 18, PIN_B = 27, PIN_I = 14):
+    def __init__(self, PIN_A = 25, PIN_B = 27, PIN_I = 7):
         self.pi = pigpio.pi()
         self.PIN_B = PIN_B
         self.PIN_A = PIN_A

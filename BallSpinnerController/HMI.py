@@ -1021,8 +1021,8 @@ class HMI:
         # self.local_ui_elements_to_show = self.initial_ui_elements_to_hide
         self.local_ui_elements_to_hide = {self.local_mode_button, self.bsc_button, }
         self.change_page(self.local_ui_elements_to_show, self.local_ui_elements_to_hide)
-        self.motor = StepperMotor(GPIOPin=12)
-        self.motor2 = StepperMotor(GPIOPin=24)
+        self.motor = StepperMotor(GPIOPin=16)
+        self.motor2 = StepperMotor(GPIOPin=20)
 
         self.stop_bsc()
 
